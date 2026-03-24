@@ -1,0 +1,24 @@
+# Credentials
+.env
+chat_agent/.env
+
+# Generated outputs
+*_output.xlsx
+
+# Personal / internal notes
+hold.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
