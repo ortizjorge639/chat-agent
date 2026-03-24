@@ -272,6 +272,8 @@ Prerequisites:
 
 1. Open Teams → **Apps** (left sidebar) → **Manage your apps** → look for
    **"Upload a custom app"** at the bottom
+
+![Teams Apps sidebar](screenshots/teams-apps-sidebar.png)
 2. If the button is missing, your Teams admin needs to enable it:
    - Teams Admin Center → **Setup policies** → enable *"Upload custom apps"*
    - Teams Admin Center → **Permission policies** → ensure custom apps aren't blocked
@@ -296,8 +298,13 @@ from Checkpoint 2, Step 1. Save the file.
    **Compress to ZIP file**. Don't zip the folder itself — the files
    must be at the root of the zip or Teams will reject it.
 2. Open Teams → **Apps** → **Manage your apps** → **Upload a custom app**
+
+![Upload custom app](screenshots/upload-custom-app.png)
+
 3. Select your zip file
 4. Teams will show your bot's details — click **Add**
+
+![Teams Add bot](screenshots/teams-add-bot.png)
 
 **Step 4 — Test it**
 
