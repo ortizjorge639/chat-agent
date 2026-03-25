@@ -29,10 +29,15 @@ async def main():
 
         print("Bot: (thinking...)", end="\r")
         try:
-            reply = await agent.ask(CONV_ID, user_input)
+            result = await agent.ask(CONV_ID, user_input)
             # Clear the "thinking" line
             print(" " * 40, end="\r")
-            print(f"Bot: {reply}")
+            # Print data chunks directly (bypasses LLM)
+            for chunk in result.get("data_chunks", []):
+                print(chunk)
+                print()
+            # Print LLM commentary
+            print(f"Bot: {result['text']}")
         except Exception as e:
             print(f"Bot: [ERROR] {e}")
         print()

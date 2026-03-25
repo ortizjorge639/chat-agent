@@ -85,7 +85,10 @@ async def chat_api(req: web.Request) -> web.Response:
 
         logger.info("Web chat [%s]: %s", conv_id, user_msg[:120])
         reply = await agent_kernel.ask(conv_id, user_msg)
-        return web.json_response({"reply": reply})
+        return web.json_response({
+            "reply": reply["text"],
+            "data_chunks": reply.get("data_chunks", []),
+        })
     except Exception as e:
         logger.error("Chat API error: %s", e, exc_info=True)
         return web.json_response({"error": str(e)}, status=500)

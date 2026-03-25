@@ -10,7 +10,7 @@ from config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
-PAGE_SIZE: int = 50
+CHUNK_SIZE: int = 60
 
 
 class DataLoader:
@@ -112,15 +112,19 @@ class DataLoader:
     def get_rows(
         self,
         table_name: str,
-        page: int = 1,
         filter_column: str | None = None,
         filter_value: str | None = None,
     ) -> dict[str, Any]:
-        """Return a page of rows (PAGE_SIZE each) with metadata."""
+        """Return ALL matching rows with metadata."""
         df = self._get_table(table_name)
         if filter_column and filter_value is not None:
             df = self._apply_filter(df, filter_column, filter_value)
-        return self._paginate(df, page)
+        return {
+            "table": table_name,
+            "rows": df.to_dict(orient="records"),
+            "total": len(df),
+            "columns": list(df.columns),
+        }
 
     def get_distinct_values(self, table_name: str, column: str) -> list[str]:
         """All unique non-null values in a column, sorted."""
@@ -128,16 +132,19 @@ class DataLoader:
         self._check_column(df, column, table_name)
         return sorted(df[column].dropna().unique().astype(str).tolist())
 
-    def query_table(
-        self, table_name: str, query_expr: str, page: int = 1
-    ) -> dict[str, Any]:
-        """Run a pandas DataFrame.query() expression and return paged results."""
+    def query_table(self, table_name: str, query_expr: str) -> dict[str, Any]:
+        """Run a pandas DataFrame.query() expression and return all matching rows."""
         df = self._get_table(table_name)
         try:
             result = df.query(query_expr)
         except Exception as exc:
             raise ValueError(f"Invalid query expression: {exc}") from exc
-        return self._paginate(result, page)
+        return {
+            "table": table_name,
+            "rows": result.to_dict(orient="records"),
+            "total": len(result),
+            "columns": list(result.columns),
+        }
 
     def group_by(
         self,
@@ -196,16 +203,3 @@ class DataLoader:
                 f"Available: {list(df.columns)}"
             )
 
-    @staticmethod
-    def _paginate(df: pd.DataFrame, page: int) -> dict[str, Any]:
-        total = len(df)
-        start = (page - 1) * PAGE_SIZE
-        end = start + PAGE_SIZE
-        page_df = df.iloc[start:end]
-        return {
-            "rows": page_df.to_dict(orient="records"),
-            "total": total,
-            "page": page,
-            "page_size": PAGE_SIZE,
-            "has_more": end < total,
-        }

@@ -124,6 +124,12 @@
                 });
                 const data = await res.json();
                 hideTyping();
+                // Render data chunks directly (bypasses LLM)
+                if (data.data_chunks && data.data_chunks.length > 0) {
+                    for (const chunk of data.data_chunks) {
+                        addMessage(chunk, 'bot');
+                    }
+                }
                 addMessage(data.reply || data.error || 'No response', 'bot');
             } catch (err) {
                 hideTyping();

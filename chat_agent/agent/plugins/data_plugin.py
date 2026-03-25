@@ -11,32 +11,32 @@ from typing import Annotated
 import pandas as pd
 from pydantic import Field
 
-from data.loader import DataLoader
+from data.loader import DataLoader, CHUNK_SIZE
 
 logger = logging.getLogger(__name__)
 
 
-def _rows_to_markdown(result: dict) -> str:
-    """Convert a paged result dict to a compact markdown table + metadata line.
-    This keeps token usage low — GPT relays the table instead of re-formatting."""
-    rows = result["rows"]
+def _rows_to_chunks(rows: list[dict], columns: list[str]) -> list[str]:
+    """Split rows into markdown table chunks of CHUNK_SIZE rows each."""
     if not rows:
-        return f"No rows found. (total: {result['total']})"
+        return []
 
-    df = pd.DataFrame(rows)
-    # Truncate long cell values to save tokens
-    for col in df.columns:
-        df[col] = df[col].astype(str).str[:120]
+    chunks = []
+    total = len(rows)
+    for i in range(0, total, CHUNK_SIZE):
+        chunk_rows = rows[i : i + CHUNK_SIZE]
+        df = pd.DataFrame(chunk_rows, columns=columns)
+        md_table = df.to_markdown(index=False)
+        header = f"**Rows {i + 1}–{min(i + CHUNK_SIZE, total)} of {total}**\n\n"
+        chunks.append(header + md_table)
 
-    md_table = df.to_markdown(index=False)
-    meta = f"\n\nShowing page {result['page']} ({len(rows)} rows). Total matching: {result['total']}."
-    if result["has_more"]:
-        meta += " **More rows available** — user can reply 'more' for the next page."
-    return md_table + meta
+    return chunks
 
 
-def create_data_tools(loader: DataLoader) -> list:
-    """Factory that returns tool callables bound to *loader*."""
+def create_data_tools(loader: DataLoader, data_buffer: list) -> list:
+    """Factory that returns tool callables bound to *loader*.
+    *data_buffer* collects markdown chunks for direct delivery to the user,
+    bypassing the LLM to save tokens."""
 
     def list_tables() -> str:
         """List every available data table together with its column names and
@@ -68,17 +68,22 @@ def create_data_tools(loader: DataLoader) -> list:
 
     def get_rows(
         table_name: Annotated[str, Field(description="Name of the table")],
-        page: Annotated[int, Field(description="Page number, 1-based (default 1)")] = 1,
         filter_column: Annotated[str, Field(description="Column to filter by (optional)")] = "",
         filter_value: Annotated[str, Field(description="Value to match (optional)")] = "",
     ) -> str:
         """Return rows from a table with optional single-column filter.
-        Returns up to 50 rows per page as a pre-formatted markdown table.
-        Set page > 1 for more rows."""
+        The full data is sent directly to the user. This tool returns only
+        a summary for your reference — do NOT fabricate or repeat the data."""
         fc = filter_column or None
         fv = filter_value or None
-        result = loader.get_rows(table_name, page, fc, fv)
-        return _rows_to_markdown(result)
+        result = loader.get_rows(table_name, fc, fv)
+        chunks = _rows_to_chunks(result["rows"], result["columns"])
+        data_buffer.extend(chunks)
+        cols = ", ".join(result["columns"])
+        return (
+            f"Retrieved {result['total']} rows from table '{table_name}' "
+            f"(columns: {cols}). Data has been sent directly to the user."
+        )
 
     def get_distinct_values(
         table_name: Annotated[str, Field(description="Name of the table")],
@@ -91,14 +96,20 @@ def create_data_tools(loader: DataLoader) -> list:
     def query_table(
         table_name: Annotated[str, Field(description="Name of the table")],
         query_expr: Annotated[str, Field(description="Pandas DataFrame.query() expression")],
-        page: Annotated[int, Field(description="Page number, 1-based (default 1)")] = 1,
     ) -> str:
         """Run a pandas query expression on a table.
         Examples: 'Age > 30', 'Status == "Active"',
         'Salary > 50000 and Department == "Engineering"'.
-        Results are paged at 50 rows. Returns a pre-formatted markdown table."""
-        result = loader.query_table(table_name, query_expr, page)
-        return _rows_to_markdown(result)
+        The full data is sent directly to the user. This tool returns only
+        a summary for your reference — do NOT fabricate or repeat the data."""
+        result = loader.query_table(table_name, query_expr)
+        chunks = _rows_to_chunks(result["rows"], result["columns"])
+        data_buffer.extend(chunks)
+        cols = ", ".join(result["columns"])
+        return (
+            f"Retrieved {result['total']} rows from table '{table_name}' "
+            f"(columns: {cols}). Data has been sent directly to the user."
+        )
 
     def group_by(
         table_name: Annotated[str, Field(description="Name of the table")],
