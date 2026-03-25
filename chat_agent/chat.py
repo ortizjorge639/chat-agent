@@ -36,6 +36,10 @@ async def main():
             for chunk in result.get("data_chunks", []):
                 print(chunk)
                 print()
+            # Print download links for generated files
+            for f in result.get("files", []):
+                print(f"📥 Download: {f['name']} -> {f['path']}")
+                print()
             # Print LLM commentary
             print(f"Bot: {result['text']}")
         except Exception as e:

@@ -18,6 +18,7 @@ from agent.kernel import AgentKernel
 from data.loader import DataLoader
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+GENERATED_DIR = os.path.join(os.path.dirname(__file__), "generated")
 
 # ── Settings ────────────────────────────────────────────
 settings = Settings()
@@ -88,6 +89,7 @@ async def chat_api(req: web.Request) -> web.Response:
         return web.json_response({
             "reply": reply["text"],
             "data_chunks": reply.get("data_chunks", []),
+            "files": reply.get("files", []),
         })
     except Exception as e:
         logger.error("Chat API error: %s", e, exc_info=True)
@@ -107,6 +109,7 @@ def main() -> None:
     app.router.add_post("/api/messages", messages)
     app.router.add_post("/api/chat", chat_api)
     app.router.add_static("/static", STATIC_DIR)
+    app.router.add_static("/api/files", GENERATED_DIR)
 
     logger.info("Bot listening on http://0.0.0.0:%s", settings.bot_port)
     logger.info("Web chat UI at  http://localhost:%s", settings.bot_port)

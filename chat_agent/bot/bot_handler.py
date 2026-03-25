@@ -40,6 +40,12 @@ class ChatBot(ActivityHandler):
         for chunk in response.get("data_chunks", []):
             await turn_context.send_activity(chunk)
 
+        # Send download links for generated files
+        for f in response.get("files", []):
+            await turn_context.send_activity(
+                f"📥 **Download full results:** [{f['name']}]({f['path']})"
+            )
+
         # Send LLM commentary
         await turn_context.send_activity(response["text"])
 

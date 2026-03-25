@@ -4,6 +4,7 @@ chat_agent/.env
 
 # Generated outputs
 *_output.xlsx
+chat_agent/generated/
 
 # Personal / internal notes
 hold.txt

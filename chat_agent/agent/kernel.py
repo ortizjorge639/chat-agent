@@ -32,8 +32,9 @@ class AgentKernel:
     """Wraps the Microsoft Agent Framework with per-conversation sessions."""
 
     def __init__(self, settings: Settings, data_loader: DataLoader) -> None:
-        # Shared buffer for data that bypasses the LLM
+        # Shared buffers for data that bypasses the LLM
         self._data_buffer: list[str] = []
+        self._file_buffer: list[dict] = []
         self._buffer_lock = asyncio.Lock()
 
         # Azure OpenAI chat client
@@ -43,8 +44,8 @@ class AgentKernel:
             deployment_name=settings.azure_openai_deployment_name,
         )
 
-        # Data tools (bound to the shared buffer)
-        tools = create_data_tools(data_loader, self._data_buffer)
+        # Data tools (bound to the shared buffers)
+        tools = create_data_tools(data_loader, self._data_buffer, self._file_buffer)
 
         # Build the agent
         self._agent = Agent(
@@ -70,11 +71,13 @@ class AgentKernel:
         """Send a user message through the agent and return the reply.
 
         Returns:
-            dict with "text" (LLM response) and "data_chunks" (list of markdown
-            tables to send directly to the user, bypassing the LLM).
+            dict with "text" (LLM response), "data_chunks" (list of markdown
+            tables), and "files" (list of generated file metadata) — all sent
+            directly to the user, bypassing the LLM.
         """
         async with self._buffer_lock:
             self._data_buffer.clear()
+            self._file_buffer.clear()
             session = self._get_session(conversation_id)
 
             try:
@@ -91,6 +94,8 @@ class AgentKernel:
                 response_text = f"⚠️ Error processing your request: {exc}"
 
             data_chunks = list(self._data_buffer)
+            files = list(self._file_buffer)
             self._data_buffer.clear()
+            self._file_buffer.clear()
 
-            return {"text": response_text, "data_chunks": data_chunks}
+            return {"text": response_text, "data_chunks": data_chunks, "files": files}
