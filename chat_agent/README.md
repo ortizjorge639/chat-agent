@@ -192,7 +192,6 @@ Once created:
    | `MICROSOFT_APP_PASSWORD` | Client secret value from Step 1 |
    | `MICROSOFT_APP_TENANT_ID` | Directory (tenant) ID from Step 1 |
    | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `1` |
-   | `WEBSITES_PORT` | `3978` |
 
    Only include the data source variables for the option you chose —
    Excel **or** SQL Server, not both.
@@ -200,10 +199,6 @@ Once created:
    > **Why `SCM_DO_BUILD_DURING_DEPLOYMENT`?** Without it, Azure copies your
    > files but never runs `pip install`. This flag tells the Oryx build
    > system to install your Python dependencies automatically.
-   >
-   > **Why `WEBSITES_PORT`?** The bot listens on port 3978 (Bot Framework
-   > convention). Azure's health probe checks port 8080 by default — this
-   > setting tells it where to look instead.
 
 3. Click **Apply** and confirm
 
@@ -357,7 +352,7 @@ Same bot code, same data layer, same tools. No rewrite.
 | Column filters | "List comments where old_part contains CQ" |
 | Group & summarize | "Break down counts by replacement_intent" |
 | Distinct values | "What are all the unique old_part values?" |
-| Paging | Results > 50 rows auto-page — reply **"more"** for the next batch |
+| Chunked output | Large results are sent in 60-row chunks with an Excel download link |
 | Follow-up context | "How many were there?" uses prior conversation context |
 
 ---
