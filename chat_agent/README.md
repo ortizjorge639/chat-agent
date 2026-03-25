@@ -191,10 +191,14 @@ Once created:
    | `MICROSOFT_APP_ID` | Application (client) ID from Step 1 |
    | `MICROSOFT_APP_PASSWORD` | Client secret value from Step 1 |
    | `MICROSOFT_APP_TENANT_ID` | Directory (tenant) ID from Step 1 |
+   | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `1` |
 
    Only include the data source variables for the option you chose —
    Excel **or** SQL Server, not both.
 
+   > **Why `SCM_DO_BUILD_DURING_DEPLOYMENT`?** Without it, Azure copies your
+   > files but never runs `pip install`. This flag tells the Oryx build
+   > system to install your Python dependencies automatically.
 
 3. Click **Apply** and confirm
 
@@ -207,12 +211,16 @@ Once created:
 First, zip your code: right-click the `chat_agent/` folder →
 **Compress to ZIP file**.
 
+> **Important:** The `wheels/` folder inside `chat_agent/` must be
+> included in the zip. It contains `agent-framework-core`, which is not
+> available on public PyPI yet.
+
 **Option A — Azure CLI (quickest)**
 
 Open a terminal in the same folder where `chat_agent.zip` was saved, then run:
 
 ```bash
-az webapp deploy --resource-group <your-resource-group> --name <your-app-service-name> --src-path chat_agent.zip
+az webapp deploy --resource-group <your-resource-group> --name <your-app-service-name> --src-path chat_agent.zip --type zip
 ```
 
 > Don't have the Azure CLI? Install it from
@@ -344,7 +352,7 @@ Same bot code, same data layer, same tools. No rewrite.
 | Column filters | "List comments where old_part contains CQ" |
 | Group & summarize | "Break down counts by replacement_intent" |
 | Distinct values | "What are all the unique old_part values?" |
-| Paging | Results > 50 rows auto-page — reply **"more"** for the next batch |
+| Chunked output | Large results are sent in 60-row chunks with an Excel download link |
 | Follow-up context | "How many were there?" uses prior conversation context |
 
 ---

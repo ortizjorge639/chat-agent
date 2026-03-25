@@ -35,7 +35,19 @@ class ChatBot(ActivityHandler):
         await turn_context.send_activity(Activity(type=ActivityTypes.typing))
 
         response = await self._agent.ask(conversation_id, user_text)
-        await turn_context.send_activity(response)
+
+        # Send data chunks directly to the user (bypasses LLM)
+        for chunk in response.get("data_chunks", []):
+            await turn_context.send_activity(chunk)
+
+        # Send download links for generated files
+        for f in response.get("files", []):
+            await turn_context.send_activity(
+                f"📥 **Download full results:** [{f['name']}]({f['path']})"
+            )
+
+        # Send LLM commentary
+        await turn_context.send_activity(response["text"])
 
     async def on_members_added_activity(self, members_added, turn_context: TurnContext) -> None:
         """Send a welcome message when the bot joins a conversation."""

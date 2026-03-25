@@ -18,6 +18,7 @@ from agent.kernel import AgentKernel
 from data.loader import DataLoader
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+GENERATED_DIR = os.path.join(os.path.dirname(__file__), "generated")
 
 # ── Settings ────────────────────────────────────────────
 settings = Settings()
@@ -85,7 +86,11 @@ async def chat_api(req: web.Request) -> web.Response:
 
         logger.info("Web chat [%s]: %s", conv_id, user_msg[:120])
         reply = await agent_kernel.ask(conv_id, user_msg)
-        return web.json_response({"reply": reply})
+        return web.json_response({
+            "reply": reply["text"],
+            "data_chunks": reply.get("data_chunks", []),
+            "files": reply.get("files", []),
+        })
     except Exception as e:
         logger.error("Chat API error: %s", e, exc_info=True)
         return web.json_response({"error": str(e)}, status=500)
@@ -104,10 +109,13 @@ def main() -> None:
     app.router.add_post("/api/messages", messages)
     app.router.add_post("/api/chat", chat_api)
     app.router.add_static("/static", STATIC_DIR)
+    app.router.add_static("/api/files", GENERATED_DIR)
 
-    logger.info("Bot listening on http://0.0.0.0:%s", settings.bot_port)
-    logger.info("Web chat UI at  http://localhost:%s", settings.bot_port)
-    web.run_app(app, host="0.0.0.0", port=settings.bot_port)
+    # Azure App Service injects PORT env var; prefer it over settings for deployment
+    port = int(os.environ.get("PORT", settings.bot_port))
+    logger.info("Bot listening on http://0.0.0.0:%s", port)
+    logger.info("Web chat UI at  http://localhost:%s", port)
+    web.run_app(app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":

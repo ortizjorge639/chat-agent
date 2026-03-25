@@ -124,6 +124,18 @@
                 });
                 const data = await res.json();
                 hideTyping();
+                // Render data chunks directly (bypasses LLM)
+                if (data.data_chunks && data.data_chunks.length > 0) {
+                    for (const chunk of data.data_chunks) {
+                        addMessage(chunk, 'bot');
+                    }
+                }
+                // Render download links for generated files
+                if (data.files && data.files.length > 0) {
+                    for (const f of data.files) {
+                        addMessage(`📥 **Download full results:** [${f.name}](${f.path})`, 'bot');
+                    }
+                }
                 addMessage(data.reply || data.error || 'No response', 'bot');
             } catch (err) {
                 hideTyping();
