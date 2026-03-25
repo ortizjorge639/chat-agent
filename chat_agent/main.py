@@ -111,9 +111,11 @@ def main() -> None:
     app.router.add_static("/static", STATIC_DIR)
     app.router.add_static("/api/files", GENERATED_DIR)
 
-    logger.info("Bot listening on http://0.0.0.0:%s", settings.bot_port)
-    logger.info("Web chat UI at  http://localhost:%s", settings.bot_port)
-    web.run_app(app, host="0.0.0.0", port=settings.bot_port)
+    # Azure App Service injects PORT env var; prefer it over settings for deployment
+    port = int(os.environ.get("PORT", settings.bot_port))
+    logger.info("Bot listening on http://0.0.0.0:%s", port)
+    logger.info("Web chat UI at  http://localhost:%s", port)
+    web.run_app(app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":

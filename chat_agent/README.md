@@ -191,10 +191,19 @@ Once created:
    | `MICROSOFT_APP_ID` | Application (client) ID from Step 1 |
    | `MICROSOFT_APP_PASSWORD` | Client secret value from Step 1 |
    | `MICROSOFT_APP_TENANT_ID` | Directory (tenant) ID from Step 1 |
+   | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `1` |
+   | `WEBSITES_PORT` | `3978` |
 
    Only include the data source variables for the option you chose —
    Excel **or** SQL Server, not both.
 
+   > **Why `SCM_DO_BUILD_DURING_DEPLOYMENT`?** Without it, Azure copies your
+   > files but never runs `pip install`. This flag tells the Oryx build
+   > system to install your Python dependencies automatically.
+   >
+   > **Why `WEBSITES_PORT`?** The bot listens on port 3978 (Bot Framework
+   > convention). Azure's health probe checks port 8080 by default — this
+   > setting tells it where to look instead.
 
 3. Click **Apply** and confirm
 
@@ -207,12 +216,16 @@ Once created:
 First, zip your code: right-click the `chat_agent/` folder →
 **Compress to ZIP file**.
 
+> **Important:** The `wheels/` folder inside `chat_agent/` must be
+> included in the zip. It contains `agent-framework-core`, which is not
+> available on public PyPI yet.
+
 **Option A — Azure CLI (quickest)**
 
 Open a terminal in the same folder where `chat_agent.zip` was saved, then run:
 
 ```bash
-az webapp deploy --resource-group <your-resource-group> --name <your-app-service-name> --src-path chat_agent.zip
+az webapp deploy --resource-group <your-resource-group> --name <your-app-service-name> --src-path chat_agent.zip --type zip
 ```
 
 > Don't have the Azure CLI? Install it from
