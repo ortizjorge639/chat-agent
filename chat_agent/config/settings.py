@@ -35,5 +35,9 @@ class Settings(BaseSettings):
     microsoft_app_tenant_id: str = ""
     bot_port: int = 3978
 
+    # Access control
+    require_auth: bool = False
+    file_download_group_id: str = ""
+
     # General
     log_level: str = "INFO"

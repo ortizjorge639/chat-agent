@@ -84,7 +84,6 @@ class AgentKernel:
                 result = await self._agent.run(
                     user_message,
                     session=session,
-                    tool_choice="auto",
                 )
                 response_text = result.text if result else (
                     "I couldn't generate a response. Please try again."

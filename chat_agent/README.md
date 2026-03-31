@@ -48,7 +48,7 @@ Formatted answer returned to user
 
 ---
 
-## Quick Start — Three Checkpoints
+## Quick Start — Four Checkpoints
 
 Work through these in order. Each checkpoint is a "save point" — don't
 move on until the current one works.
@@ -193,6 +193,10 @@ Once created:
    | `MICROSOFT_APP_TENANT_ID` | Directory (tenant) ID from Step 1 |
    | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `1` |
 
+   > **Security variables (`REQUIRE_AUTH`, `FILE_DOWNLOAD_GROUP_ID`)** are
+   > configured later in [Checkpoint 4](#checkpoint-4-secure-access--internal--user-restricted)
+   > — don't set them now.
+
    Only include the data source variables for the option you chose —
    Excel **or** SQL Server, not both.
 
@@ -203,7 +207,7 @@ Once created:
 3. Click **Apply** and confirm
 
 4. Go to **Settings** → **Configuration** → **General settings**
-   - Startup command: `python main.py`
+   - Startup command: `antenv/bin/python main.py`
    - Click **Save**
 
 **Step 5 — Deploy your code**
@@ -212,16 +216,22 @@ First, zip your code: right-click the `chat_agent/` folder →
 **Compress to ZIP file**.
 
 > **Important:** The `wheels/` folder inside `chat_agent/` must be
-> included in the zip. It contains `agent-framework-core`, which is not
-> available on public PyPI yet.
+> included in the zip. It contains `agent-framework-core` and
+> `agent-framework-azure-ai`, which are pre-release packages that
+> require the `--pre` flag in `requirements.txt` to install correctly.
 
 **Option A — Azure CLI (quickest)**
 
 Open a terminal in the same folder where `chat_agent.zip` was saved, then run:
 
 ```bash
-az webapp deploy --resource-group <your-resource-group> --name <your-app-service-name> --src-path chat_agent.zip --type zip
+az webapp deployment source config-zip --resource-group <your-resource-group> --name <your-app-service-name> --src chat_agent.zip
 ```
+
+> **Why `config-zip` and not `az webapp deploy`?** The `deploy --type zip`
+> command does not always trigger the Oryx build (pip install). The
+> `config-zip` command reliably triggers the build. The CLI will warn
+> it's deprecated — ignore that, it still works.
 
 > Don't have the Azure CLI? Install it from
 > [https://learn.microsoft.com/cli/azure/install-azure-cli](https://learn.microsoft.com/cli/azure/install-azure-cli),
@@ -253,11 +263,9 @@ az webapp deploy --resource-group <your-resource-group> --name <your-app-service
 
 ![Test in Web Chat](screenshots/test-in-web-chat.png)
 
-> **Note:** During development, the Bot Service integration (Entra auth,
-> "Test in Web Chat," Teams channel) was verified using a Dev Tunnel
-> pointing to a local instance of the bot. The App Service deployment
-> steps above have not yet been validated end-to-end — please confirm
-> they work in your environment and flag any issues.
+> **Note:** The App Service deployment and Checkpoint 4 security
+> controls were validated end-to-end on 2026-03-31. If you hit issues,
+> check the Troubleshooting table below.
 
 #### Troubleshooting
 
@@ -266,7 +274,11 @@ az webapp deploy --resource-group <your-resource-group> --name <your-app-service
 | "Test in Web Chat" shows nothing | Messaging endpoint is wrong or App Service isn't running | Check the endpoint URL ends with `/api/messages`; check App Service logs |
 | `Unauthorized` errors | App ID / password / tenant ID mismatch | Double-check all three values match between Entra, Bot Service, and App Service env vars |
 | `missing service principal` | App Registration has no service principal | Azure Portal → Entra ID → Enterprise applications → search your app. If missing, create one via `az ad sp create --id <APP_ID>` |
-| App Service returns 5xx | Startup command not set or dependencies missing | Check **Log stream** in App Service; verify startup command is `python main.py` |
+| App Service returns 5xx | Startup command not set or dependencies missing | Check **Log stream** in App Service; verify startup command is `antenv/bin/python main.py` |
+| `ModuleNotFoundError: agent_framework_azure_ai` | Oryx build didn't install all dependencies | Ensure `agent-framework-azure-ai` is in `requirements.txt` with `--pre` flag; redeploy with `config-zip` |
+| `antenv/bin/python: not found` | Oryx build didn't run or timed out | Verify `SCM_DO_BUILD_DURING_DEPLOYMENT=1` is set; use `config-zip` (not `deploy --type zip`); check build logs |
+| `AADSTS700054: response_type 'id_token' is not enabled` | App registration missing redirect URI and ID tokens | Entra ID → App registrations → your app → Authentication → Add Web platform with redirect URI `https://<app>.azurewebsites.net/.auth/login/aad/callback` → enable **ID tokens** |
+| `unexpected keyword argument 'tool_choice'` | Agent Framework version mismatch | Pin exact versions in `requirements.txt` to match bundled wheels; redeploy |
 
 ### Checkpoint 3: Teams ✅
 
@@ -330,6 +342,263 @@ from Checkpoint 2, Step 1. Save the file.
 
 ---
 
+### Checkpoint 4: Secure Access — Internal & User-Restricted
+
+Goal: the web app is accessible **only by approved users** — not
+everyone in the tenant — and network access is restricted to authorized
+sources only.
+
+Prerequisites:
+- Checkpoint 2 must be working (bot responds in Azure Portal "Test in Web Chat")
+
+> **Why this matters.** The bot exposes internal supply chain data.
+> Without these controls, anyone with the URL or tenant access can
+> query it.
+
+**Step 1 — Configure network restrictions (infrastructure team)**
+
+> **Important — Teams requires inbound access from Microsoft's cloud.**
+> When a user sends a message in Teams, it routes through Microsoft's
+> Bot Service — which lives outside your corporate VNet. A fully
+> private endpoint (public access disabled) blocks this traffic and
+> **breaks both Teams and "Test in Web Chat"**.
+>
+> Work with your infrastructure team to choose one of these approaches:
+>
+> | Approach | How it works | Teams? |
+> |----------|-------------|--------|
+> | **Application Gateway** | Private App Service behind a gateway that accepts Bot Service traffic | ✅ Yes |
+> | **Access restrictions** | Public endpoint, allowlist `AzureBotService` service tag + corporate VPN range, deny all else | ✅ Yes |
+> | **Private endpoint only** | No public access at all | ❌ No — Bot Service and Teams blocked |
+>
+> The app is **internal-only from a user standpoint** (Entra ID enforces
+> this). The networking choice controls which *infrastructure services*
+> can reach the App Service.
+
+![App Service Networking — current state](screenshots/networking-current-state.png)
+
+Verify with your infrastructure team that the chosen approach is in
+place before proceeding. If using access restrictions, confirm:
+
+1. Azure Portal → your App Service → **Networking** → **Access restrictions**
+2. `AzureBotService` service tag is allowed (for Teams / "Test in Web Chat")
+3. Corporate VPN IP range is allowed (for web UI access)
+4. All other traffic is denied
+
+**Step 2 — Enable Entra ID authentication (Easy Auth)**
+
+Gate every HTTP request behind a Microsoft sign-in — no code changes
+needed. Two parts: configure the app registration, then enable Easy Auth.
+
+**Part A — Configure the app registration for web sign-in**
+
+1. Azure Portal → **Microsoft Entra ID** → **App registrations** →
+   Select your app (e.g. `Extron Data Bot`)
+
+![Entra ID App registrations](screenshots/easy-auth-app-registrations.png)
+
+2. Go to **Authentication** → **Add a platform** → select **Web**
+3. Redirect URI:
+   ```
+   https://<your-app-service-name>.azurewebsites.net/.auth/login/aad/callback
+   ```
+   Then, Under **Implicit grant and hybrid flows**, check **ID tokens** and hit Configure
+
+![Add Redirect URI](screenshots/easy-auth-redirect-uri.png)
+
+4. Verify in Settings Tab: Under **Implicit grant and hybrid flows**, check **ID tokens**
+5. Leave all other fields as defaults
+6. Click **Save**
+
+![Authentication settings — ID tokens enabled](screenshots/easy-auth-id-tokens.png)
+
+> **Why is this needed?** Easy Auth completes the login by redirecting
+> back to the `/.auth/login/aad/callback` URL with an ID token. Without
+> the redirect URI and ID tokens enabled, sign-in fails with
+> `AADSTS700054`.
+
+**Part B — Enable Easy Auth on the App Service**
+
+1. Azure Portal → your App Service → **Authentication**
+
+![App Service Authentication — starting point](screenshots/easy-auth-start.png)
+
+2. Click **Add identity provider**
+3. Identity provider: **Microsoft**
+4. App registration type: **Pick an existing app registration**
+5. Select the same app registration (e.g. `Extron Data Bot`)
+
+![Add identity provider — Basics](screenshots/easy-auth-add-provider-basics.png)
+
+6. Unauthenticated requests: **HTTP 302 Found redirect**
+7. Token store: **On**
+8. Leave all other fields as their defaults — no other changes needed
+
+![Add identity provider — Auth settings](screenshots/easy-auth-add-provider-settings.png)
+
+9. Click **Add**
+
+![App Service Authentication — configured](screenshots/easy-auth-complete.png)
+
+Once saved, the web UI (`/`) and `/api/chat` require a Microsoft login.
+`/api/messages` is unaffected — Bot Framework has its own auth.
+
+Then set this environment variable on the App Service to enable
+defense-in-depth in the app code:
+
+| Name | Value |
+|------|-------|
+| `REQUIRE_AUTH` | `true` |
+
+> Where: Add this environment variable to the App Service (Settings → Environment variables → Add):
+
+> **What does this do?** A safety net — if Easy Auth is ever
+> misconfigured, the app itself rejects unauthenticated requests.
+
+Verify before proceeding:
+
+1. Open the web UI in a **private/incognito window** — you should be
+   redirected to a Microsoft login page
+2. Sign in with your account — you should reach the chat UI
+3. Check App Service → **Authentication** in the portal — status should
+   show **Enabled** with your identity provider listed
+
+**Step 3 — Limit access to specific users or groups**
+
+By default, any user in the tenant can sign in. To restrict access to
+a specific set of people:
+
+1. Azure Portal → **Microsoft Entra ID** → **Enterprise applications**
+
+![Enterprise applications list](screenshots/enterprise-apps-list.png)
+
+2. Search for your app (e.g. `Extron Data Bot`) and open it
+
+![Enterprise Application overview](screenshots/enterprise-app-overview.png)
+
+3. Go to **Overview**
+4. Under **Getting Started**, click **1. Assign users and groups** →
+   **Assign users and groups**
+5. Select the individuals that should have access and click **Select**
+
+![Add user assignment](screenshots/add-user-assignment.png)
+
+6. Click **Assign** — the user now appears in the assigned list
+
+![Users and groups — assigned](screenshots/users-and-groups-assigned.png)
+
+Anyone not assigned will see an error when they try to sign in —
+they will not be able to reach the web UI or the Teams bot.
+
+> **Recommended:** Create two security groups in Entra ID:
+>
+> - `SG-Extron-Bot-Chat` — can use the bot and view inline data (most users)
+> - `SG-Extron-Bot-Download` — can also download generated Excel files (select analysts only)
+>
+> Assign **both** groups to the Enterprise Application so members of
+> either group can sign in. Step 4 handles which group can download.
+
+**Step 4 — Restrict file downloads to a specific group**
+
+The bot generates Excel files when users query data. By default, all
+authenticated users can download these files. To restrict downloads to
+a smaller group:
+
+1. **Enable group claims** — Azure Portal → **Microsoft Entra ID** →
+   **App registrations** → your app → **Token configuration** →
+   **Add groups claim** → select **Security groups** → click **Add**
+
+   ![Token configuration — Add groups claim](screenshots/token-groups-claim.png)
+
+   > **This step is critical.** Without it, the identity token won't
+   > contain group memberships and the download check will silently
+   > fail (all downloads blocked).
+
+2. **Create the download security group** — Azure Portal →
+   **Microsoft Entra ID** → **Groups** → **New group**
+
+   ![Groups overview — starting point](screenshots/groups-overview-empty.png)
+
+   Set **Group type** to **Security**, name it
+   `SG-Extron-Bot-Download`, add the users who should be able to
+   download files, and click **Create**.
+
+   ![Create download security group](screenshots/create-download-group.png)
+
+3. **Get the group's Object ID** — Once created, open the group and
+   copy the **Object ID** shown in the list.
+
+   ![Download group — Object ID](screenshots/download-group-object-id.png)
+
+4. **Add this environment variable** to the App Service (Settings →
+   Environment variables → **Add**):
+
+   | Name | Value |
+   |------|-------|
+   | `FILE_DOWNLOAD_GROUP_ID` | The Object ID from step 3 |
+
+   ![Add FILE_DOWNLOAD_GROUP_ID env var](screenshots/add-file-download-group-id.png)
+
+   Click **Apply** to save.
+
+   ![Environment variables overview](screenshots/env-vars-overview.png)
+
+Once configured:
+- Users in the download group see inline data **and** get a download
+  link for the full Excel file
+- Users **not** in the group see the inline data but no download link
+- Direct URL access to `/api/files/` returns `403 Forbidden`
+
+Leave `FILE_DOWNLOAD_GROUP_ID` blank to allow all authenticated users
+to download (the default).
+
+**Step 5 — Control Teams bot visibility (Teams admin task)**
+
+Steps 1–4 block unauthorized access. This step hides the bot so
+unauthorized users don't encounter it in the first place.
+
+> **Prerequisite:** Step 1 networking must allow `AzureBotService`
+> traffic — otherwise Teams cannot reach the bot.
+
+Ask your **Teams administrator** to:
+
+1. **Teams Admin Center** → **Manage apps** → upload the app package
+   to the **Org app catalog**
+2. Go to **Setup policies** → create or edit a policy
+3. Under **Installed apps**, add your bot
+4. Assign the policy to the same security group from Step 3
+
+Only assigned users will see the bot in Teams — everyone else won't
+know it exists.
+
+**Step 6 — Test it**
+
+Run through these checks in order. Each builds on the previous one.
+
+1. **Network** — Access the App Service URL from an unauthorized network
+   (not on VPN, not Bot Service) → should be denied
+2. **Easy Auth** — Open the web UI in a private/incognito window →
+   should redirect to Microsoft login
+3. **User restriction** — Sign in as a user **not** in the assigned
+   group → should see an access denied error
+4. **Download restriction** — Sign in as a user **not** in the download
+   group, run a query → should see inline data but no download link
+5. **Download allowed** — Sign in as a user **in** the download group,
+   run the same query → should see the download link
+
+   ![Web UI — download link visible for authorized user](screenshots/web-ui-with-download.png)
+
+6. **Direct file access** — Try `/api/files/<filename>` as a
+   non-download user → should return `403`
+7. **Teams visibility** — Sign in to Teams as a non-assigned user →
+   bot should not appear in the app list
+8. **Defense-in-depth** — Send a request to `/api/chat` without Easy
+   Auth headers → should return `401`
+
+If all checks pass, Checkpoint 4 is done.
+
+---
+
 ### Scaling (future)
 
 Single-instance App Service works for the POC. Two changes for production:
@@ -352,7 +621,7 @@ Same bot code, same data layer, same tools. No rewrite.
 | Column filters | "List comments where old_part contains CQ" |
 | Group & summarize | "Break down counts by replacement_intent" |
 | Distinct values | "What are all the unique old_part values?" |
-| Chunked output | Large results are sent in 60-row chunks with an Excel download link |
+| Chunked output | Large results are sent in 60-row chunks; download link shown to authorised users |
 | Follow-up context | "How many were there?" uses prior conversation context |
 
 ---
@@ -414,6 +683,8 @@ Then grab your credentials:
 | `MICROSOFT_APP_ID` | For Teams | — | Entra app registration |
 | `MICROSOFT_APP_PASSWORD` | For Teams | — | Client secret |
 | `MICROSOFT_APP_TENANT_ID` | For Teams | — | Azure AD tenant ID |
+| `REQUIRE_AUTH` | Production | `false` | `true` to enforce Easy Auth on web UI (see [Checkpoint 4](#checkpoint-4-secure-access--internal--user-restricted)) |
+| `FILE_DOWNLOAD_GROUP_ID` | Production | — | Azure AD Object ID of group allowed to download files |
 | `BOT_PORT` | Always | `3978` | Server port |
 | `LOG_LEVEL` | Always | `INFO` | Python log level |
 

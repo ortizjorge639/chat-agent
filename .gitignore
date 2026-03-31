@@ -6,6 +6,14 @@ chat_agent/.env
 *_output.xlsx
 chat_agent/generated/
 
+# Deployment artifacts
+*_deploy.zip
+chat_agent_deploy.zip
+
+# App Service logs
+applogs/
+applogs.zip
+
 # Personal / internal notes
 hold.txt
 chat-agent.md
