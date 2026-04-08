@@ -6,6 +6,9 @@ chat_agent/.env
 *_output.xlsx
 chat_agent/generated/
 
+# Generated docs
+chat_agent/README.docx
+
 # Deployment artifacts
 *_deploy.zip
 chat_agent_deploy.zip

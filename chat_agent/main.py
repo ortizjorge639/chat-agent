@@ -6,6 +6,10 @@ import logging
 import os
 import sys
 
+# Ensure the app's own directory is on the import path (required for
+# Azure App Service where Oryx extracts to /tmp/ but doesn't cd into it).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from aiohttp import web
 from botbuilder.core import (
     BotFrameworkAdapter,

@@ -16,6 +16,7 @@ class ChatBot(ActivityHandler):
     def __init__(self, agent: AgentKernel) -> None:
         super().__init__()
         self._agent = agent
+        self._processed_ids: dict[str, str] = {}  # conversation_id → last activity_id
 
     async def on_message_activity(self, turn_context: TurnContext) -> None:
         """Process each user message through the AI agent."""
@@ -24,7 +25,14 @@ class ChatBot(ActivityHandler):
             await turn_context.send_activity("Please send a text message.")
             return
 
+        # Dedup: skip if Teams retried the same activity
         conversation_id = turn_context.activity.conversation.id
+        activity_id = turn_context.activity.id or ""
+        if activity_id and self._processed_ids.get(conversation_id) == activity_id:
+            logger.warning("Skipping duplicate activity %s", activity_id)
+            return
+        if activity_id:
+            self._processed_ids[conversation_id] = activity_id
         logger.info(
             "Message from conversation %s: %s",
             conversation_id,

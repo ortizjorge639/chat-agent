@@ -1,6 +1,7 @@
 """Data access layer — loads from Excel or SQL Server based on DATASOURCE flag."""
 
 import logging
+from difflib import get_close_matches
 from pathlib import Path
 from typing import Any
 
@@ -13,12 +14,37 @@ logger = logging.getLogger(__name__)
 CHUNK_SIZE: int = 60
 
 
+def _fuzzy_resolve(needle: str, haystack: list[str], label: str = "value") -> str:
+    """Case-insensitive lookup with fuzzy fallback.
+
+    1. Exact match → return as-is
+    2. Case-insensitive match → return the canonical form
+    3. Fuzzy match (>0.6 cutoff) → return best match
+    4. No match → raise ValueError with suggestions
+    """
+    if needle in haystack:
+        return needle
+
+    lower_map = {h.lower(): h for h in haystack}
+    if needle.lower() in lower_map:
+        return lower_map[needle.lower()]
+
+    matches = get_close_matches(needle.lower(), [h.lower() for h in haystack], n=1, cutoff=0.6)
+    if matches:
+        return lower_map[matches[0]]
+
+    raise ValueError(
+        f"{label} '{needle}' not found. Available: {haystack}"
+    )
+
+
 class DataLoader:
     """Loads tabular data from Excel files or SQL Server and exposes query helpers."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._tables: dict[str, pd.DataFrame] = {}
+        self._table_roles: dict[str, str] = {}  # table_name → "primary" | "supplemental"
         self._load()
 
     # ── loaders ──────────────────────────────────────────
@@ -33,12 +59,22 @@ class DataLoader:
             raise ValueError(f"Unknown DATASOURCE: {self._settings.datasource!r}")
 
     def _load_excel(self) -> None:
+        import re
         folder = Path(self._settings.excel_folder_path)
         if not folder.exists():
             raise FileNotFoundError(f"Excel folder not found: {folder}")
 
+        # Timestamp-prefixed files (e.g. 20260312154848_output.xlsx) are primary
+        timestamp_pattern = re.compile(r"^\d{8,}_")
+
         for fp in sorted(folder.glob("*.xlsx")):
             xls = pd.ExcelFile(fp)
+            # Classify file role
+            if timestamp_pattern.match(fp.stem):
+                role = "primary"
+            else:
+                role = "supplemental"
+
             for sheet in xls.sheet_names:
                 table_name = (
                     f"{fp.stem}__{sheet}" if len(xls.sheet_names) > 1 else fp.stem
@@ -46,9 +82,11 @@ class DataLoader:
                 df = pd.read_excel(xls, sheet_name=sheet)
                 df.columns = [str(c).strip() for c in df.columns]
                 self._tables[table_name] = df
+                self._table_roles[table_name] = role
                 logger.info(
-                    "Loaded table '%s' (%d rows, %d cols)",
+                    "Loaded table '%s' [%s] (%d rows, %d cols)",
                     table_name,
+                    role,
                     len(df),
                     len(df.columns),
                 )
@@ -78,6 +116,7 @@ class DataLoader:
         df = pd.read_sql(f"SELECT * FROM [{table}]", conn)
         df.columns = [str(c).strip() for c in df.columns]
         self._tables[table] = df
+        self._table_roles[table] = "primary"  # SQL source is always the primary dataset
         conn.close()
         logger.info(
             "Loaded SQL table '%s' (%d rows, %d cols)",
@@ -91,6 +130,10 @@ class DataLoader:
     def list_tables(self) -> list[str]:
         """Return names of all loaded tables."""
         return list(self._tables.keys())
+
+    def get_table_roles(self) -> dict[str, str]:
+        """Return {table_name: role} for all tables."""
+        return dict(self._table_roles)
 
     def get_schema(self, table_name: str) -> dict[str, str]:
         """Return {column_name: dtype} for a table."""
@@ -129,8 +172,8 @@ class DataLoader:
     def get_distinct_values(self, table_name: str, column: str) -> list[str]:
         """All unique non-null values in a column, sorted."""
         df = self._get_table(table_name)
-        self._check_column(df, column, table_name)
-        return sorted(df[column].dropna().unique().astype(str).tolist())
+        resolved = self._check_column(df, column, table_name)
+        return sorted(df[resolved].dropna().unique().astype(str).tolist())
 
     def query_table(self, table_name: str, query_expr: str) -> dict[str, Any]:
         """Run a pandas DataFrame.query() expression and return all matching rows."""
@@ -155,10 +198,10 @@ class DataLoader:
     ) -> list[dict[str, Any]]:
         """Group by a column with optional aggregation."""
         df = self._get_table(table_name)
-        self._check_column(df, group_column, table_name)
+        group_column = self._check_column(df, group_column, table_name)
 
         if agg_column:
-            self._check_column(df, agg_column, table_name)
+            agg_column = self._check_column(df, agg_column, table_name)
             result = (
                 df.groupby(group_column)[agg_column]
                 .agg(agg_func)
@@ -173,33 +216,33 @@ class DataLoader:
     # ── helpers ──────────────────────────────────────────
 
     def _get_table(self, table_name: str) -> pd.DataFrame:
-        if table_name not in self._tables:
-            available = ", ".join(self._tables.keys()) or "(none)"
-            raise ValueError(
-                f"Table '{table_name}' not found. Available tables: {available}"
-            )
-        return self._tables[table_name]
+        resolved = _fuzzy_resolve(table_name, list(self._tables.keys()), label="Table")
+        if resolved != table_name:
+            logger.info("Fuzzy-resolved table '%s' → '%s'", table_name, resolved)
+        return self._tables[resolved]
 
     @staticmethod
     def _apply_filter(df: pd.DataFrame, column: str, value: str) -> pd.DataFrame:
-        if column not in df.columns:
-            raise ValueError(
-                f"Column '{column}' not found. Available: {list(df.columns)}"
-            )
+        resolved_col = _fuzzy_resolve(column, list(df.columns), label="Column")
+        if resolved_col != column:
+            logger.info("Fuzzy-resolved column '%s' → '%s'", column, resolved_col)
         # Use numeric comparison for numeric columns to avoid "0.8" != "0.80"
-        if pd.api.types.is_numeric_dtype(df[column]):
+        if pd.api.types.is_numeric_dtype(df[resolved_col]):
             try:
                 num_val = float(value)
-                return df[df[column] == num_val]
+                return df[df[resolved_col] == num_val]
             except (ValueError, TypeError):
                 pass
-        return df[df[column].astype(str).str.lower() == value.lower()]
+        # Fuzzy-match the filter value against actual unique values in the column
+        unique_vals = df[resolved_col].dropna().astype(str).unique().tolist()
+        resolved_val = _fuzzy_resolve(value, unique_vals, label="Value")
+        return df[df[resolved_col].astype(str).str.lower() == resolved_val.lower()]
 
     @staticmethod
-    def _check_column(df: pd.DataFrame, column: str, table_name: str) -> None:
-        if column not in df.columns:
-            raise ValueError(
-                f"Column '{column}' not found in table '{table_name}'. "
-                f"Available: {list(df.columns)}"
-            )
+    def _check_column(df: pd.DataFrame, column: str, table_name: str) -> str:
+        """Resolve column name with fuzzy matching. Returns the canonical name."""
+        resolved = _fuzzy_resolve(column, list(df.columns), label="Column")
+        if resolved != column:
+            logger.info("Fuzzy-resolved column '%s' → '%s'", column, resolved)
+        return resolved
 

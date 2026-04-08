@@ -1,5 +1,13 @@
 # Chat-Over-Data Bot — Extron Component Replacements
 
+> **Changelog**
+> - **2026-04-06** — Rewrote Step 5 (zip deploy) to fix Windows
+>   backslash path issue; added App Gateway guidance to Step 6;
+>   expanded troubleshooting with 5 new entries; added `sys.path` fix
+>   to `main.py`.
+> - **2026-03-31** — Added Checkpoint 4 (Easy Auth, user assignment,
+>   download gating, APIM migration section).
+
 ## What This Is
 
 A conversational bot that lets users ask plain-English questions about
@@ -212,37 +220,34 @@ Once created:
 
 **Step 5 — Deploy your code**
 
-First, zip your code: right-click the `chat_agent/` folder →
-**Compress to ZIP file**.
+> **⚠️ Do not use Windows right-click → Compress or `Compress-Archive`.**
+> They write backslash paths that Linux can't extract. Use the Python
+> script below.
 
-> **Important:** The `wheels/` folder inside `chat_agent/` must be
-> included in the zip. It contains `agent-framework-core` and
-> `agent-framework-azure-ai`, which are pre-release packages that
-> require the `--pre` flag in `requirements.txt` to install correctly.
+1. Open PowerShell and `cd` **into** the project folder:
 
-**Option A — Azure CLI (quickest)**
+   ```powershell
+   cd C:\path\to\extron\chat_agent
+   ```
 
-Open a terminal in the same folder where `chat_agent.zip` was saved, then run:
+2. Create the zip (forward-slash paths, no `__pycache__`):
 
-```bash
-az webapp deployment source config-zip --resource-group <your-resource-group> --name <your-app-service-name> --src chat_agent.zip
-```
+   ```powershell
+   python -c "import zipfile, os; z=zipfile.ZipFile(r'C:\Temp\deploy.zip','w',zipfile.ZIP_DEFLATED); [z.write(os.path.join(r,f),os.path.join(r,f).replace(os.sep,'/')) for r,d,fs in os.walk('.') if '__pycache__' not in r for f in fs if not f.endswith('.pyc')]; z.close(); print('Done')"
+   ```
 
-> **Why `config-zip` and not `az webapp deploy`?** The `deploy --type zip`
-> command does not always trigger the Oryx build (pip install). The
-> `config-zip` command reliably triggers the build. The CLI will warn
-> it's deprecated — ignore that, it still works.
+3. **Verify:** Open `C:\Temp\deploy.zip` — `main.py` and
+   `requirements.txt` must be at the **root** (not inside a subfolder).
 
-> Don't have the Azure CLI? Install it from
-> [https://learn.microsoft.com/cli/azure/install-azure-cli](https://learn.microsoft.com/cli/azure/install-azure-cli),
-> then run `az login` before deploying.
+4. Deploy (~300 seconds):
 
-**Option B — GitHub (best for ongoing updates)**
+   ```powershell
+   az webapp deployment source config-zip --resource-group <your-resource-group> --name <your-app-service-name> --src C:\Temp\deploy.zip
+   ```
 
-1. Push your code to a GitHub repo (public or private — both work)
-2. Azure Portal → your App Service → **Deployment** → **Deployment Center**
-3. Source: **GitHub** → sign in and select your repo and branch
-4. Click **Save** — Azure will pull and deploy automatically on every push
+> **Why `config-zip`?** `az webapp deploy --type zip` doesn't reliably
+> trigger the Oryx build. `config-zip` does. The deprecation warning is
+> safe to ignore.
 
 **Step 6 — Point Bot Service to App Service**
 
@@ -251,6 +256,9 @@ az webapp deployment source config-zip --resource-group <your-resource-group> --
    ```
    https://<your-app-service-name>.azurewebsites.net/api/messages
    ```
+   > **Behind an App Gateway or APIM?** Use the gateway's public URL
+   > instead (e.g. `https://<gateway-domain>/api/messages`). The App
+   > Service URL will return `403` if direct access is blocked.
 3. Click **Apply**
 
 ![Bot Service Configuration](screenshots/bot-configuration.png)
@@ -263,22 +271,31 @@ az webapp deployment source config-zip --resource-group <your-resource-group> --
 
 ![Test in Web Chat](screenshots/test-in-web-chat.png)
 
-> **Note:** The App Service deployment and Checkpoint 4 security
-> controls were validated end-to-end on 2026-03-31. If you hit issues,
-> check the Troubleshooting table below.
+> **Note:** Deployment validated on 2026-04-06 (Obsolescence App Service,
+> West US 2, behind Application Gateway). Checkpoint 4 security controls
+> validated on 2026-03-31. If you hit issues, check the Troubleshooting
+> table below.
 
 #### Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| "Test in Web Chat" shows nothing | Messaging endpoint is wrong or App Service isn't running | Check the endpoint URL ends with `/api/messages`; check App Service logs |
+| "Test in Web Chat" — no response, no errors | Messaging endpoint wrong or behind App Gateway | Verify URL ends with `/api/messages`; if behind a gateway, use the gateway URL — not the App Service URL |
+| `403 Forbidden` on App Service URL | App Service behind App Gateway / APIM | Use the gateway's public URL instead; direct access is blocked |
 | `Unauthorized` errors | App ID / password / tenant ID mismatch | Double-check all three values match between Entra, Bot Service, and App Service env vars |
 | `missing service principal` | App Registration has no service principal | Azure Portal → Entra ID → Enterprise applications → search your app. If missing, create one via `az ad sp create --id <APP_ID>` |
-| App Service returns 5xx | Startup command not set or dependencies missing | Check **Log stream** in App Service; verify startup command is `antenv/bin/python main.py` |
-| `ModuleNotFoundError: agent_framework_azure_ai` | Oryx build didn't install all dependencies | Ensure `agent-framework-azure-ai` is in `requirements.txt` with `--pre` flag; redeploy with `config-zip` |
-| `antenv/bin/python: not found` | Oryx build didn't run or timed out | Verify `SCM_DO_BUILD_DURING_DEPLOYMENT=1` is set; use `config-zip` (not `deploy --type zip`); check build logs |
-| `AADSTS700054: response_type 'id_token' is not enabled` | App registration missing redirect URI and ID tokens | Entra ID → App registrations → your app → Authentication → Add Web platform with redirect URI `https://<app>.azurewebsites.net/.auth/login/aad/callback` → enable **ID tokens** |
+| App Service returns 5xx | Startup command not set or dependencies missing | Check **Log stream**; verify startup command is `antenv/bin/python main.py` |
+| `ModuleNotFoundError` for local packages (e.g. `config`) | Windows backslash paths in zip **or** Oryx extraction path issue | Re-zip using the Python `zipfile` script (Step 5); ensure `sys.path.insert` is in `main.py` |
+| `Could not find requirements.txt` in build log | Zip structure wrong — `requirements.txt` nested in a subfolder | Re-zip from **inside** the project folder, not its parent |
+| Build finishes in <60 seconds | Oryx skipped `pip install` | Verify `SCM_DO_BUILD_DURING_DEPLOYMENT=1` is set; use `config-zip` (not `deploy --type zip`) |
+| `antenv/bin/python: not found` | Oryx build didn't run | Same as above — check build log for "Could not find requirements.txt" |
+| `ConnectionResetError: 10054` on deploy | SCM access restrictions blocking your IP | Temporarily add your IP to SCM allow list; remove after deploy |
+| `AADSTS700054: response_type 'id_token' is not enabled` | App registration missing redirect URI and ID tokens | Entra ID → App registrations → Authentication → Add Web platform with redirect URI `https://<app>.azurewebsites.net/.auth/login/aad/callback` → enable **ID tokens** |
 | `unexpected keyword argument 'tool_choice'` | Agent Framework version mismatch | Pin exact versions in `requirements.txt` to match bundled wheels; redeploy |
+| Teams upload: `Manifest parsing error` | Placeholder app ID in `manifest.json` | Replace `<your-app-id-from-entra>` with the actual Application (client) ID in both the `id` and `botId` fields |
+
+> **For deep-dive troubleshooting:** See [Deployment Troubleshooting Guide](../Deployment_Troubleshooting_Guide.md)
+> for root cause analysis, diagnostic commands, and step-by-step fixes.
 
 ### Checkpoint 3: Teams ✅
 
