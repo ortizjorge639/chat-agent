@@ -67,9 +67,10 @@ class DataLoader:
         # Timestamp-prefixed files (e.g. 20260312154848_output.xlsx) are primary
         timestamp_pattern = re.compile(r"^\d{8,}_")
 
-        for fp in sorted([*folder.glob("*.xlsx"), *folder.glob("*.xls")]):
-            engine = "xlrd" if fp.suffix == ".xls" else "openpyxl"
-            xls = pd.ExcelFile(fp, engine=engine)
+        for fp in sorted(folder.glob("*.xlsx")):
+            if fp.name.startswith("~$"):
+                continue  # skip Excel lock files
+            xls = pd.ExcelFile(fp, engine="openpyxl")
             # Classify file role
             if timestamp_pattern.match(fp.stem):
                 role = "primary"

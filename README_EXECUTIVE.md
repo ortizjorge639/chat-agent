@@ -1,4 +1,4 @@
-# Extron Part Replacement Intelligence
+# Contoso Data Intelligence
 
 ### Turning Unstructured Comments into Actionable Supply Chain Data
 
@@ -6,7 +6,7 @@
 
 ## The Business Problem
 
-Extron maintains **hundreds of thousands of free-text component comments** written by employees describing part changes — replacements, retirements, transitions, and alternatives. These comments are **business-critical**: if a part is being replaced by another, it **cannot be scrapped**.
+Contoso maintains **hundreds of thousands of free-text component comments** written by employees describing part changes — replacements, retirements, transitions, and alternatives. These comments are **business-critical**: if a part is being replaced by another, it **cannot be scrapped**.
 
 The challenge? There is **no standard format**. Part numbers follow no consistent pattern, and the language used to describe replacements varies wildly — *"phasing out," "path forward," "provisional replacement," "shifted toward,"* and dozens of other phrasings.
 
@@ -22,15 +22,15 @@ The project started with a Custom NER (Named Entity Recognition) approach — tr
 
 ### Phase 2 — The Breaking Point: Fine-Tuning Becomes Unsustainable
 
-As Maciej continued refining the Custom NER model, a critical problem surfaced: **the model was getting the must-be-correct cases wrong.** When confidence was low, Custom NER would simply return no entity at all — silently dropping parts that the business *cannot* afford to miss.
+As the team continued refining the Custom NER model, a critical problem surfaced: **the model was getting the must-be-correct cases wrong.** When confidence was low, Custom NER would simply return no entity at all — silently dropping parts that the business *cannot* afford to miss.
 
-Worse, retraining was fragile and unpredictable. Adding just **three new training records caused a 12% swing** in results from the previous model version. As Maciej put it: *"That is a very wild swing."* Each retraining cycle risked introducing new regressions, making the refinement process tedious and unreliable. The root cause: label quality sensitivity meant that small inconsistencies in training data could cascade into disproportionate accuracy drops.
+Worse, retraining was fragile and unpredictable. Adding just **three new training records caused a 12% swing** in results from the previous model version. Each retraining cycle risked introducing new regressions, making the refinement process tedious and unreliable. The root cause: label quality sensitivity meant that small inconsistencies in training data could cascade into disproportionate accuracy drops.
 
 ### Phase 3 — The Pivot: LLM-Based Extraction
 
 Given these challenges, the team posed a question: **what if we skip fine-tuning entirely and use a large language model (LLM) — AI that already understands language — to do the extraction?**
 
-The LLM approach was framed as a decision gate — if it achieved high accuracy on the must-have test cases, Custom NER would no longer be needed. Maciej tested it and confirmed: **the LLM approach worked, with high accuracy on the required cases.**
+The LLM approach was framed as a decision gate — if it achieved high accuracy on the must-have test cases, Custom NER would no longer be needed. The team tested it and confirmed: **the LLM approach worked, with high accuracy on the required cases.**
 
 Instead of training a custom model from scratch, the solution now uses **Azure OpenAI (GPT-5-mini)** with carefully engineered prompts to:
 
@@ -44,7 +44,7 @@ This approach eliminated the labeling bottleneck entirely, removed the fragile r
 
 ## How It Works Today
 
-The solution is a streamlined pipeline that reads Extron's component comments and produces a structured, analyst-ready output:
+The solution is a streamlined pipeline that reads Contoso's component comments and produces a structured, analyst-ready output:
 
 ```
 ┌─────────────────────┐
@@ -135,10 +135,10 @@ The infrastructure footprint is intentionally lightweight — no VMs, no cluster
 ## What's Next
 
 - **Scale to production** — Process the full 300K–400K comment backlog through Azure OpenAI
-- **Integrate into Fabric** — Feed AI-enriched data directly into Extron's data pipeline (ETL)
+- **Integrate into Fabric** — Feed AI-enriched data directly into Contoso's data pipeline (ETL)
 - **Continuous processing** — Automatically analyze new comments as they arrive
 - **Confidence-based routing** — Auto-approve high-confidence results, flag low-confidence rows for human review
-- **Cross-reference validation** — Validate extracted part numbers against Extron's known part universe
+- **Cross-reference validation** — Validate extracted part numbers against Contoso's known part universe
 
 ---
 

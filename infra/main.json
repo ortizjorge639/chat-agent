@@ -1,0 +1,504 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.42.1.51946",
+      "templateHash": "18168408868872667708"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "eastus",
+      "metadata": {
+        "description": "Azure region for all resources"
+      }
+    },
+    "projectName": {
+      "type": "string",
+      "defaultValue": "contoso",
+      "metadata": {
+        "description": "Base name used to derive resource names (keeps naming consistent)"
+      }
+    },
+    "environment": {
+      "type": "string",
+      "defaultValue": "dev",
+      "allowedValues": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Environment suffix (dev, staging, prod)"
+      }
+    },
+    "existingOpenAiName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the EXISTING Azure OpenAI resource in this resource group"
+      }
+    },
+    "azureOpenAiApiKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Azure OpenAI API key (pass from pipeline secret variable or Key Vault)"
+      }
+    },
+    "azureOpenAiDeploymentName": {
+      "type": "string",
+      "defaultValue": "gpt-4.1-mini",
+      "metadata": {
+        "description": "Azure OpenAI model deployment name"
+      }
+    },
+    "microsoftAppId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Bot Framework Microsoft App ID (from Entra ID app registration)"
+      }
+    },
+    "microsoftAppPassword": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Bot Framework Microsoft App Password"
+      }
+    },
+    "microsoftAppTenantId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Bot Framework Tenant ID"
+      }
+    },
+    "appServiceSku": {
+      "type": "string",
+      "defaultValue": "B1",
+      "metadata": {
+        "description": "App Service SKU"
+      }
+    },
+    "botServiceSku": {
+      "type": "string",
+      "defaultValue": "F0",
+      "metadata": {
+        "description": "Bot Service SKU"
+      }
+    }
+  },
+  "variables": {
+    "appServiceName": "[format('app-{0}-{1}', parameters('projectName'), parameters('environment'))]",
+    "botServiceName": "[format('bot-{0}-{1}', parameters('projectName'), parameters('environment'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "openai-lookup",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "openAiName": {
+            "value": "[parameters('existingOpenAiName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "17232062873600051012"
+            }
+          },
+          "parameters": {
+            "openAiName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the existing Azure OpenAI resource"
+              }
+            }
+          },
+          "resources": [],
+          "outputs": {
+            "openAiEndpoint": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('openAiName')), '2023-05-01').endpoint]"
+            },
+            "openAiResourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('openAiName'))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "appservice-deploy",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "appServiceName": {
+            "value": "[variables('appServiceName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "skuName": {
+            "value": "[parameters('appServiceSku')]"
+          },
+          "azureOpenAiEndpoint": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'openai-lookup'), '2025-04-01').outputs.openAiEndpoint.value]"
+          },
+          "azureOpenAiApiKey": {
+            "value": "[parameters('azureOpenAiApiKey')]"
+          },
+          "azureOpenAiDeploymentName": {
+            "value": "[parameters('azureOpenAiDeploymentName')]"
+          },
+          "microsoftAppId": {
+            "value": "[parameters('microsoftAppId')]"
+          },
+          "microsoftAppPassword": {
+            "value": "[parameters('microsoftAppPassword')]"
+          },
+          "microsoftAppTenantId": {
+            "value": "[parameters('microsoftAppTenantId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "8511564098758038276"
+            }
+          },
+          "parameters": {
+            "appServiceName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the App Service (must be globally unique — it becomes <name>.azurewebsites.net)"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region to deploy into"
+              }
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "B1",
+              "allowedValues": [
+                "B1",
+                "B2",
+                "S1",
+                "S2",
+                "P1v3"
+              ],
+              "metadata": {
+                "description": "SKU for the App Service Plan (B1=Basic, S1=Standard, P1v3=Premium)"
+              }
+            },
+            "azureOpenAiEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI endpoint URL (passed as app setting)"
+              }
+            },
+            "azureOpenAiApiKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Azure OpenAI API key (passed as app setting)"
+              }
+            },
+            "azureOpenAiDeploymentName": {
+              "type": "string",
+              "defaultValue": "gpt-4.1-mini",
+              "metadata": {
+                "description": "Azure OpenAI deployment/model name"
+              }
+            },
+            "microsoftAppId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Bot Framework App ID"
+              }
+            },
+            "microsoftAppPassword": {
+              "type": "securestring",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Bot Framework App Password"
+              }
+            },
+            "microsoftAppTenantId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Bot Framework Tenant ID"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2022-09-01",
+              "name": "[format('{0}-plan', parameters('appServiceName'))]",
+              "location": "[parameters('location')]",
+              "kind": "linux",
+              "sku": {
+                "name": "[parameters('skuName')]"
+              },
+              "properties": {
+                "reserved": true
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2022-09-01",
+              "name": "[parameters('appServiceName')]",
+              "location": "[parameters('location')]",
+              "kind": "app,linux",
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('appServiceName')))]",
+                "httpsOnly": true,
+                "siteConfig": {
+                  "linuxFxVersion": "PYTHON|3.11",
+                  "appCommandLine": "python main.py",
+                  "alwaysOn": true
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('appServiceName')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Web/sites/config",
+              "apiVersion": "2022-09-01",
+              "name": "[format('{0}/{1}', parameters('appServiceName'), 'appsettings')]",
+              "properties": {
+                "AZURE_OPENAI_ENDPOINT": "[parameters('azureOpenAiEndpoint')]",
+                "AZURE_OPENAI_API_KEY": "[parameters('azureOpenAiApiKey')]",
+                "AZURE_OPENAI_DEPLOYMENT_NAME": "[parameters('azureOpenAiDeploymentName')]",
+                "MICROSOFT_APP_ID": "[parameters('microsoftAppId')]",
+                "MICROSOFT_APP_PASSWORD": "[parameters('microsoftAppPassword')]",
+                "MICROSOFT_APP_TENANT_ID": "[parameters('microsoftAppTenantId')]",
+                "WEBSITE_RUN_FROM_PACKAGE": "1",
+                "SCM_DO_BUILD_DURING_DEPLOYMENT": "true"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('appServiceName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "appServiceUrl": {
+              "type": "string",
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', parameters('appServiceName')), '2022-09-01').defaultHostName)]"
+            },
+            "appServiceName": {
+              "type": "string",
+              "value": "[parameters('appServiceName')]"
+            },
+            "appServiceResourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Web/sites', parameters('appServiceName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'openai-lookup')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "botservice-deploy",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "botName": {
+            "value": "[variables('botServiceName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "messagingEndpoint": {
+            "value": "[format('{0}/api/messages', reference(resourceId('Microsoft.Resources/deployments', 'appservice-deploy'), '2025-04-01').outputs.appServiceUrl.value)]"
+          },
+          "microsoftAppId": {
+            "value": "[parameters('microsoftAppId')]"
+          },
+          "microsoftAppTenantId": {
+            "value": "[parameters('microsoftAppTenantId')]"
+          },
+          "skuName": {
+            "value": "[parameters('botServiceSku')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "8733746341830844573"
+            }
+          },
+          "parameters": {
+            "botName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Bot Service resource"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region (Bot Service is global, but metadata needs a location)"
+              }
+            },
+            "messagingEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "The messaging endpoint — where Bot Framework sends messages to your app"
+              }
+            },
+            "microsoftAppId": {
+              "type": "string",
+              "metadata": {
+                "description": "Microsoft App ID (from Entra ID app registration)"
+              }
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "F0",
+              "allowedValues": [
+                "F0",
+                "S1"
+              ],
+              "metadata": {
+                "description": "SKU: F0=Free (10k messages/month), S1=Standard (unlimited)"
+              }
+            },
+            "microsoftAppTenantId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Microsoft App Tenant ID"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.BotService/botServices",
+              "apiVersion": "2022-09-15",
+              "name": "[parameters('botName')]",
+              "location": "global",
+              "kind": "azurebot",
+              "sku": {
+                "name": "[parameters('skuName')]"
+              },
+              "properties": {
+                "displayName": "[parameters('botName')]",
+                "endpoint": "[parameters('messagingEndpoint')]",
+                "msaAppId": "[parameters('microsoftAppId')]",
+                "msaAppTenantId": "[parameters('microsoftAppTenantId')]",
+                "msaAppType": "SingleTenant"
+              }
+            },
+            {
+              "type": "Microsoft.BotService/botServices/channels",
+              "apiVersion": "2022-09-15",
+              "name": "[format('{0}/{1}', parameters('botName'), 'MsTeamsChannel')]",
+              "location": "global",
+              "properties": {
+                "channelName": "MsTeamsChannel",
+                "properties": {
+                  "isEnabled": true
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.BotService/botServices', parameters('botName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.BotService/botServices/channels",
+              "apiVersion": "2022-09-15",
+              "name": "[format('{0}/{1}', parameters('botName'), 'WebChatChannel')]",
+              "location": "global",
+              "properties": {
+                "channelName": "WebChatChannel",
+                "properties": {
+                  "sites": [
+                    {
+                      "siteName": "Default",
+                      "isEnabled": true
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.BotService/botServices', parameters('botName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "botServiceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.BotService/botServices', parameters('botName'))]"
+            },
+            "botName": {
+              "type": "string",
+              "value": "[parameters('botName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'appservice-deploy')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "appServiceUrl": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'appservice-deploy'), '2025-04-01').outputs.appServiceUrl.value]"
+    },
+    "appServiceName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'appservice-deploy'), '2025-04-01').outputs.appServiceName.value]"
+    },
+    "botServiceId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'botservice-deploy'), '2025-04-01').outputs.botServiceId.value]"
+    },
+    "openAiEndpoint": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'openai-lookup'), '2025-04-01').outputs.openAiEndpoint.value]"
+    }
+  }
+}

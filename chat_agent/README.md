@@ -1,4 +1,4 @@
-# Chat-Over-Data Bot — Extron Component Replacements
+# Chat-Over-Data Bot — Contoso Data Assistant
 
 > **Changelog**
 > - **2026-04-06** — Rewrote Step 5 (zip deploy) to fix Windows
@@ -11,7 +11,7 @@
 ## What This Is
 
 A conversational bot that lets users ask plain-English questions about
-Extron's component replacement data — directly inside **Microsoft Teams**
+Contoso's tabular data — directly inside **Microsoft Teams**
 or a **built-in web UI**.
 
 Ask things like *"How many parts have replacement intent?"* or
@@ -123,7 +123,7 @@ Goal: bot runs in Azure App Service and responds through Azure Bot Service.
 You need an app registration so Bot Service can authenticate your bot.
 
 1. Azure Portal → **Microsoft Entra ID** → **App registrations** → **New registration**
-2. Name: `Extron Data Bot`
+2. Name: `Contoso Data Bot`
 3. Supported account types: **Accounts in this organizational directory only** (Single tenant)
 4. Redirect URI: leave blank
 5. Click **Register**
@@ -144,8 +144,8 @@ You need an app registration so Bot Service can authenticate your bot.
 **Step 2 — Create the Azure Bot Service**
 
 1. Azure Portal → **Create a resource** → search **Azure Bot** → **Create**
-2. Bot handle: `extron-data-bot`
-3. Resource group: use your existing one (e.g. `rg-extron`) or create new
+2. Bot handle: `contoso-data-bot`
+3. Resource group: use your existing one (e.g. `rg-contoso`) or create new
 4. Data residency: **Global** (unless your org requires a specific region)
 5. Pricing tier: **F0** (free)
 5. Type of App: **Single Tenant**
@@ -167,7 +167,7 @@ Once created:
 
 1. Azure Portal → **Create a resource** → search **Web App** → **Create**
 2. Resource group: same as your Bot Service
-3. Name: pick a name (e.g. `extron-data-bot-app`)
+3. Name: pick a name (e.g. `contoso-data-bot-app`)
 4. Secure unique default hostname: **On** (this adds a random string to
    your URL to prevent name conflicts — leave it on)
 5. Publish: **Code**
@@ -227,7 +227,7 @@ Once created:
 1. Open PowerShell and `cd` **into** the project folder:
 
    ```powershell
-   cd C:\path\to\extron\chat_agent
+   cd C:\path\to\contoso\chat_agent
    ```
 
 2. Create the zip (forward-slash paths, no `__pycache__`):
@@ -271,7 +271,7 @@ Once created:
 
 ![Test in Web Chat](screenshots/test-in-web-chat.png)
 
-> **Note:** Deployment validated on 2026-04-06 (Obsolescence App Service,
+> **Note:** Deployment validated on 2026-04-06 (App Service,
 > West US 2, behind Application Gateway). Checkpoint 4 security controls
 > validated on 2026-03-31. If you hit issues, check the Troubleshooting
 > table below.
@@ -345,7 +345,7 @@ from Checkpoint 2, Step 1. Save the file.
 
 **Step 4 — Test it**
 
-1. Open a chat with **Extron Data Bot** in Teams
+1. Open a chat with **Contoso Data Bot** in Teams
 2. Ask: *"How many rows are there?"*
 3. If you get an answer, Checkpoint 3 is done.
 
@@ -410,7 +410,7 @@ needed. Two parts: configure the app registration, then enable Easy Auth.
 **Part A — Configure the app registration for web sign-in**
 
 1. Azure Portal → **Microsoft Entra ID** → **App registrations** →
-   Select your app (e.g. `Extron Data Bot`)
+   Select your app (e.g. `Contoso Data Bot`)
 
 ![Entra ID App registrations](screenshots/easy-auth-app-registrations.png)
 
@@ -443,7 +443,7 @@ needed. Two parts: configure the app registration, then enable Easy Auth.
 2. Click **Add identity provider**
 3. Identity provider: **Microsoft**
 4. App registration type: **Pick an existing app registration**
-5. Select the same app registration (e.g. `Extron Data Bot`)
+5. Select the same app registration (e.g. `Contoso Data Bot`)
 
 ![Add identity provider — Basics](screenshots/easy-auth-add-provider-basics.png)
 
@@ -489,7 +489,7 @@ a specific set of people:
 
 ![Enterprise applications list](screenshots/enterprise-apps-list.png)
 
-2. Search for your app (e.g. `Extron Data Bot`) and open it
+2. Search for your app (e.g. `Contoso Data Bot`) and open it
 
 ![Enterprise Application overview](screenshots/enterprise-app-overview.png)
 
@@ -509,8 +509,8 @@ they will not be able to reach the web UI or the Teams bot.
 
 > **Recommended:** Create two security groups in Entra ID:
 >
-> - `SG-Extron-Bot-Chat` — can use the bot and view inline data (most users)
-> - `SG-Extron-Bot-Download` — can also download generated Excel files (select analysts only)
+> - `SG-Contoso-Bot-Chat` — can use the bot and view inline data (most users)
+> - `SG-Contoso-Bot-Download` — can also download generated Excel files (select analysts only)
 >
 > Assign **both** groups to the Enterprise Application so members of
 > either group can sign in. Step 4 handles which group can download.
@@ -537,7 +537,7 @@ a smaller group:
    ![Groups overview — starting point](screenshots/groups-overview-empty.png)
 
    Set **Group type** to **Security**, name it
-   `SG-Extron-Bot-Download`, add the users who should be able to
+   `SG-Contoso-Bot-Download`, add the users who should be able to
    download files, and click **Create**.
 
    ![Create download security group](screenshots/create-download-group.png)
@@ -653,10 +653,10 @@ Any model that supports tool calling works (GPT-4o, GPT-4.1 mini, GPT-5 mini, et
 If you need to create one from scratch:
 
 1. Azure Portal → **Create a resource** → search **Azure OpenAI** → **Create**
-2. Resource group: use your existing one (e.g. `rg-extron`)
+2. Resource group: use your existing one (e.g. `rg-contoso`)
 3. Region: **East US 2** (or wherever your other resources are)
-4. Name: `extron-openai` (this becomes your custom domain —
-   the endpoint will be `https://extron-openai.openai.azure.com/`)
+4. Name: `contoso-openai` (this becomes your custom domain —
+   the endpoint will be `https://contoso-openai.openai.azure.com/`)
 5. Pricing tier: **S0**
 6. Click **Review + create** → **Create**
 

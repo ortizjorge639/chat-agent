@@ -1,0 +1,217 @@
+# ══════════════════════════════════════════════════════════════
+# Azure DevOps CI/CD Pipeline
+# Deploys: Infrastructure (Bicep) + Source Code (chat_agent/)
+# Target:  Resource Group 'rg-contoso-demo'
+# ══════════════════════════════════════════════════════════════
+
+# ── TRIGGER ──────────────────────────────────────────────────
+# Pipeline automatically runs when code is pushed to 'main'.
+# You can add more branches or use PR triggers later.
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - chat_agent/**     # Only trigger on app code changes
+      - infra/**          # Or infrastructure changes
+
+# ── AGENT POOL ───────────────────────────────────────────────
+# 'ubuntu-latest' = Microsoft-hosted Linux VM (free tier has 1800 mins/month)
+pool:
+  vmImage: 'ubuntu-latest'
+
+# ── VARIABLES ────────────────────────────────────────────────
+# Centralized config. Secrets (apiKey, appPassword) should be stored
+# in Azure DevOps Pipeline Variables (Library) — NOT here in plain text.
+#
+# To set secrets: Pipeline → Edit → Variables → Add variable → check "Keep secret"
+variables:
+  # Azure connection — this is the Service Connection name in Azure DevOps
+  # Set up via: Project Settings → Service Connections → Azure Resource Manager
+  azureSubscription: 'service-connection-thursday'
+
+  # Resource group (already exists with your OpenAI resource)
+  resourceGroupName: 'rg-contoso-demo'
+  location: 'eastus'
+
+  # Naming
+  projectName: 'contoso'
+  environment: 'dev'
+  appServiceName: 'app-contoso-dev'
+
+  # OpenAI (name of your EXISTING resource — find it in Azure Portal)
+  existingOpenAiName: 'contoso-openai-demo'
+  azureOpenAiDeploymentName: 'gpt-4.1-mini'
+
+  # Python version for building the app
+  pythonVersion: '3.11'
+
+# ══════════════════════════════════════════════════════════════
+# STAGE 1: BUILD
+# Purpose: Validate infrastructure + package application code
+# ══════════════════════════════════════════════════════════════
+stages:
+- stage: Build
+  displayName: 'Build & Validate'
+  jobs:
+  - job: ValidateAndPackage
+    displayName: 'Validate Bicep + Package App'
+    steps:
+
+    # ── Step 1a: Validate Bicep ──────────────────────────────
+    # This catches syntax errors BEFORE deployment.
+    # "What-if" shows what WOULD change without actually deploying.
+    - task: AzureCLI@2
+      displayName: 'Validate Bicep templates'
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "=== Installing Bicep CLI ==="
+          az bicep install
+
+          echo "=== Building Bicep (checks for syntax errors) ==="
+          az bicep build --file infra/main.bicep
+
+          echo "=== Validating deployment (dry-run against Azure) ==="
+          az deployment group validate \
+            --resource-group $(resourceGroupName) \
+            --template-file infra/main.bicep \
+            --parameters @infra/parameters.json \
+            --parameters azureOpenAiApiKey='placeholder-for-validation'
+
+          echo "✅ Bicep validation passed"
+
+    # ── Step 1b: Set up Python ───────────────────────────────
+    # Installs the Python version your app needs
+    - task: UsePythonVersion@0
+      displayName: 'Use Python $(pythonVersion)'
+      inputs:
+        versionSpec: '$(pythonVersion)'
+
+    # ── Step 1c: Install dependencies ────────────────────────
+    # This proves the requirements.txt is valid and all packages resolve.
+    # The --find-links handles your local .whl files.
+    - script: |
+        cd chat_agent
+        python -m pip install --upgrade pip
+        pip install --find-links wheels -r requirements.txt
+      displayName: 'Install Python dependencies'
+
+    # ── Step 1d: Package the app ─────────────────────────────
+    # Creates a zip of chat_agent/ → this becomes a "build artifact"
+    # that the deploy stage picks up. This separation means:
+    #   - Build once, deploy many times (dev → staging → prod)
+    #   - Exact same code in every environment
+    - task: ArchiveFiles@2
+      displayName: 'Zip chat_agent into deployable package'
+      inputs:
+        rootFolderOrFile: 'chat_agent'
+        includeRootFolder: false    # Don't nest under chat_agent/ in the zip
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/chat_agent.zip'
+        replaceExistingArchive: true
+
+    # ── Step 1e: Publish the artifact ────────────────────────
+    # "Publish" = save the zip so later stages can download it.
+    # Without this, Stage 2 can't access the zip (stages run on fresh VMs).
+    - publish: '$(Build.ArtifactStagingDirectory)/chat_agent.zip'
+      artifact: 'app-package'
+      displayName: 'Publish app package artifact'
+
+    # ── Step 1f: Publish IaC files as artifact ───────────────
+    # The deploy stage needs the Bicep files too
+    - publish: 'infra'
+      artifact: 'infra'
+      displayName: 'Publish infra artifact'
+
+# ══════════════════════════════════════════════════════════════
+# STAGE 2: DEPLOY INFRASTRUCTURE
+# Purpose: Create/update Azure resources (App Service, Bot)
+# Depends on: Build (artifacts must exist)
+# ══════════════════════════════════════════════════════════════
+- stage: DeployInfra
+  displayName: 'Deploy Infrastructure'
+  dependsOn: Build
+  jobs:
+  - job: DeployBicep
+    displayName: 'Deploy Bicep to Azure'
+    steps:
+
+    # ── Step 2a: Download the infra artifact ─────────────────
+    - download: current
+      artifact: 'infra'
+      displayName: 'Download infra artifact'
+
+    # ── Step 2b: Deploy Bicep ────────────────────────────────
+    # az deployment group create: the core command that actually
+    # creates/updates resources in Azure.
+    #
+    # --mode Incremental: only adds/updates, never deletes existing resources
+    #   (vs 'Complete' which would DELETE anything not in the template — dangerous!)
+    #
+    # Secrets are passed via $(variableName) which Azure DevOps resolves
+    # from pipeline secret variables.
+    - task: AzureCLI@2
+      displayName: 'Deploy infrastructure with Bicep'
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "=== Installing Bicep CLI ==="
+          az bicep install
+
+          echo "=== Deploying infrastructure ==="
+          az deployment group create \
+            --resource-group $(resourceGroupName) \
+            --template-file $(Pipeline.Workspace)/infra/main.bicep \
+            --parameters $(Pipeline.Workspace)/infra/parameters.json \
+            --parameters \
+              azureOpenAiApiKey='$(AZURE_OPENAI_API_KEY)' \
+              microsoftAppId='$(MICROSOFT_APP_ID)' \
+              microsoftAppPassword='$(MICROSOFT_APP_PASSWORD)' \
+              microsoftAppTenantId='$(MICROSOFT_APP_TENANT_ID)' \
+            --mode Incremental \
+            --verbose
+
+          echo "✅ Infrastructure deployment complete"
+
+# ══════════════════════════════════════════════════════════════
+# STAGE 3: DEPLOY SOURCE CODE
+# Purpose: Push chat_agent code to App Service
+# Depends on: DeployInfra (the App Service must exist first)
+# ══════════════════════════════════════════════════════════════
+- stage: DeployApp
+  displayName: 'Deploy Application'
+  dependsOn: DeployInfra
+  jobs:
+  - job: DeployToAppService
+    displayName: 'Deploy to App Service'
+    steps:
+
+    # ── Step 3a: Download the app package ────────────────────
+    - download: current
+      artifact: 'app-package'
+      displayName: 'Download app package'
+
+    # ── Step 3b: Deploy to App Service ───────────────────────
+    # AzureWebApp@1 is the recommended task for deploying to App Service.
+    # It handles zip deployment, slot swapping, etc.
+    #
+    # How zip deploy works:
+    #   1. Uploads chat_agent.zip to App Service's /home/site/wwwroot
+    #   2. Oryx (Azure's build system) detects Python, installs requirements.txt
+    #   3. App restarts with the new code
+    #   4. Your appCommandLine ('python main.py') kicks in
+    - task: AzureWebApp@1
+      displayName: 'Deploy chat_agent to App Service'
+      inputs:
+        azureSubscription: $(azureSubscription)
+        appType: 'webAppLinux'        # Must match: Linux App Service
+        appName: $(appServiceName)     # Must match the Bicep-created name
+        package: '$(Pipeline.Workspace)/app-package/chat_agent.zip'
+        runtimeStack: 'PYTHON|3.11'
+        startUpCommand: 'python main.py'  # Same as Bicep's appCommandLine

@@ -1,10 +1,10 @@
 # ══════════════════════════════════════════════════════════════════
-# setup_demo.ps1 — Extron Part Replacement Intelligence Demo Setup
+# setup_demo.ps1 — Contoso Data Intelligence Demo Setup
 # ══════════════════════════════════════════════════════════════════
 #
 # WHAT THIS DOES
 # ──────────────
-# Rather than using the Data Agent in Fabric, Maciej built a custom
+# Rather than using the Data Agent in Fabric, the team built a custom
 # AI agent programmatically using Azure OpenAI's GPT-5-mini model
 # and Python.
 #
@@ -25,9 +25,9 @@
 # ══════════════════════════════════════════════════════════════════
 
 # ---------- Configuration ----------
-$RESOURCE_GROUP   = "rg-extron-demo-temp"
+$RESOURCE_GROUP   = "rg-contoso-demo-temp"
 $LOCATION         = "eastus2"
-$AOAI_ACCOUNT     = "aoai-extron-demo-temp"
+$AOAI_ACCOUNT     = "aoai-contoso-demo-temp"
 $DEPLOYMENT_NAME  = "gpt-5-mini"
 $MODEL_NAME       = "gpt-5-mini"
 $MODEL_VERSION    = "2025-08-07"
@@ -63,7 +63,7 @@ az cognitiveservices account create `
     -o none
 
 # ---------- Step 4: Deploy the GPT-5-mini model ----------
-# This is the specific model Maciej selected for the agent —
+# This is the specific model selected for the agent —
 # it balances speed, cost, and accuracy for high-volume extraction
 Write-Host "`n=== Deploying model: $MODEL_NAME as '$DEPLOYMENT_NAME' ===" -ForegroundColor Cyan
 az cognitiveservices account deployment create `

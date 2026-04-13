@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "botName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the Azure Bot Service."
+      }
+    },
+    "endpointUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "The messaging endpoint URL for the bot."
+      }
+    },
+    "appId": {
+      "type": "string",
+      "metadata": {
+        "description": "The Microsoft App ID for the bot."
+      }
+    },
+    "appPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "The Microsoft App Password for the bot."
+      }
+    }
+  }
+}

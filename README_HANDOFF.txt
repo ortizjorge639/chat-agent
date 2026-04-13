@@ -1,11 +1,11 @@
-Hey Maciej,
+Hey Team,
 
 Based on the last error we hit, try running the following commands.
 
 
 Step 1 - Open the Kudu console in your browser
 
-  https://obsolescence-atgsb0dph5bwe2du.scm.westus2-01.azurewebsites.net/DebugConsole
+  https://<your-app-name>-<random>.scm.<region>.azurewebsites.net/DebugConsole
 
 
 Step 2 - Find where the Python library lives
@@ -27,14 +27,14 @@ Step 3 - Test the fix manually in Kudu
 
 Step 4 - Make it permanent (run in cmd on your local machine)
 
-  az webapp config set --resource-group Obsolescence-app-westus2 --name Obsolescence --startup-file "export LD_LIBRARY_PATH=/tmp/oryx/platforms/python/3.11.15/lib && antenv/bin/python main.py"
+  az webapp config set --resource-group <your-resource-group> --name <your-app-name> --startup-file "export LD_LIBRARY_PATH=/tmp/oryx/platforms/python/3.11.15/lib && antenv/bin/python main.py"
 
   This updates the App Service startup command so it sets the library path every time.
 
 
 Step 5 - Restart the app
 
-  az webapp restart --resource-group Obsolescence-app-westus2 --name Obsolescence
+  az webapp restart --resource-group <your-resource-group> --name <your-app-name>
 
 
 Step 6 - Test the bot

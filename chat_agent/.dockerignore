@@ -4,5 +4,4 @@ __pycache__/
 *.pyc
 .git/
 *.md
-EMAIL_FOR_MACIEJ.txt
 create_mock_data.py

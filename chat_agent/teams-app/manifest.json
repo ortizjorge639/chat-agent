@@ -9,10 +9,10 @@
     "privacyUrl": "https://example.com/privacy",
     "termsOfUseUrl": "https://example.com/terms"
   },
-  "name": { "short": "Extron Data Bot" },
+  "name": { "short": "Contoso Data Bot" },
   "description": {
     "short": "Ask questions about component replacement data",
-    "full": "A conversational bot that answers natural language questions about Extron component replacement data."
+    "full": "A conversational bot that answers natural language questions about Contoso component data."
   },
   "icons": { "outline": "outline.png", "color": "color.png" },
   "accentColor": "#FFFFFF",
