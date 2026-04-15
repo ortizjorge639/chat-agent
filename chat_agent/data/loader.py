@@ -93,24 +93,53 @@ class DataLoader:
                     len(df.columns),
                 )
 
+    @staticmethod
+    def _detect_odbc_driver() -> str:
+        """Auto-detect the best available SQL Server ODBC driver."""
+        import pyodbc
+
+        preferred = ["ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server"]
+        available = [d for d in pyodbc.drivers() if "SQL Server" in d]
+        for driver in preferred:
+            if driver in available:
+                return driver
+        if available:
+            return available[0]
+        raise RuntimeError(
+            "No SQL Server ODBC driver found. "
+            "Install 'ODBC Driver 17 for SQL Server' or 'ODBC Driver 18 for SQL Server' "
+            "from https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server"
+        )
+
     def _load_sql(self) -> None:
-        import pyodbc  # deferred import — only needed for production
+        try:
+            import pyodbc  # deferred import — only needed for SQL data source
+        except ImportError:
+            raise ImportError(
+                "pyodbc is required when DATASOURCE=sql. "
+                "Install it with: pip install pyodbc>=5.0.0"
+            ) from None
 
         s = self._settings
+        driver = self._detect_odbc_driver()
+        logger.info("Using ODBC driver: %s", driver)
+
         if s.sql_trusted_connection.lower() == "yes":
             conn_str = (
-                f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+                f"DRIVER={{{driver}}};"
                 f"SERVER={s.sql_server};"
                 f"DATABASE={s.sql_database};"
                 f"Trusted_Connection=yes;"
+                f"TrustServerCertificate=yes;"
             )
         else:
             conn_str = (
-                f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+                f"DRIVER={{{driver}}};"
                 f"SERVER={s.sql_server};"
                 f"DATABASE={s.sql_database};"
                 f"UID={s.sql_username};"
                 f"PWD={s.sql_password};"
+                f"TrustServerCertificate=yes;"
             )
 
         conn = pyodbc.connect(conn_str)
