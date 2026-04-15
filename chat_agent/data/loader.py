@@ -14,6 +14,15 @@ logger = logging.getLogger(__name__)
 CHUNK_SIZE: int = 60
 
 
+def _bracket_table_name(raw: str) -> str:
+    """Safely bracket a SQL table name, handling schema-qualified and pre-bracketed values."""
+    raw = raw.strip()
+    if raw.startswith("["):
+        return raw
+    parts = raw.split(".", 1)
+    return ".".join(f"[{p}]" for p in parts)
+
+
 def _fuzzy_resolve(needle: str, haystack: list[str], label: str = "value") -> str:
     """Case-insensitive lookup with fuzzy fallback.
 
@@ -144,7 +153,7 @@ class DataLoader:
 
         conn = pyodbc.connect(conn_str)
         table = s.sql_table
-        df = pd.read_sql(f"SELECT * FROM [{table}]", conn)
+        df = pd.read_sql(f"SELECT * FROM {_bracket_table_name(table)}", conn)
         df.columns = [str(c).strip() for c in df.columns]
         self._tables[table] = df
         self._table_roles[table] = "primary"  # SQL source is always the primary dataset
