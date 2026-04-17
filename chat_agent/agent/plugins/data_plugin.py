@@ -17,7 +17,12 @@ from data.loader import DataLoader, CHUNK_SIZE
 
 logger = logging.getLogger(__name__)
 
-GENERATED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "generated")
+# Use /tmp for generated files so runFromPackage (read-only wwwroot) works.
+# Falls back to local ./generated for local dev.
+GENERATED_DIR = os.environ.get(
+    "GENERATED_DIR",
+    os.path.join(os.path.dirname(__file__), "..", "..", "generated"),
+)
 MAX_INLINE_ROWS = 200  # Beyond this, skip chat display and offer Excel only
 
 
@@ -113,7 +118,9 @@ def create_data_tools(
             return (
                 f"Retrieved {result['total']} rows from table '{table_name}' "
                 f"(columns: {cols}). That's too many to display inline, so the "
-                f"data has been exported to a downloadable Excel file instead."
+                f"data has been exported to a downloadable Excel file instead. "
+                f"The download link has been automatically sent to the user. "
+                f"Do NOT include any links, URLs, or file paths in your response."
             )
 
         chunks = _rows_to_chunks(result["rows"], result["columns"])
@@ -157,7 +164,9 @@ def create_data_tools(
             return (
                 f"Retrieved {result['total']} rows from table '{table_name}' "
                 f"(columns: {cols}). That's too many to display inline, so the "
-                f"data has been exported to a downloadable Excel file instead."
+                f"data has been exported to a downloadable Excel file instead. "
+                f"The download link has been automatically sent to the user. "
+                f"Do NOT include any links, URLs, or file paths in your response."
             )
 
         chunks = _rows_to_chunks(result["rows"], result["columns"])
@@ -197,7 +206,11 @@ def create_data_tools(
             file_buffer.append(file_info)
             row_count = len(last_result['rows'])
             last_result.clear()
-            return f"Excel file generated: {file_info['name']} ({row_count} rows)"
+            return (
+                f"Excel file generated: {file_info['name']} ({row_count} rows). "
+                f"The download link has been automatically sent to the user. "
+                f"Do NOT include any links, URLs, or file paths in your response."
+            )
 
         if not table_name:
             return "No recent query results and no table specified. Provide a table_name."
@@ -207,7 +220,11 @@ def create_data_tools(
         result = loader.get_rows(table_name, fc, fv)
         file_info = _generate_excel(result["rows"], result["columns"], table_name)
         file_buffer.append(file_info)
-        return f"Excel file generated: {file_info['name']} ({result['total']} rows)"
+        return (
+            f"Excel file generated: {file_info['name']} ({result['total']} rows). "
+            f"The download link has been automatically sent to the user. "
+            f"Do NOT include any links, URLs, or file paths in your response."
+        )
 
     return [list_tables, get_schema, count_rows, get_rows,
             get_distinct_values, query_table, group_by, download_as_excel]
