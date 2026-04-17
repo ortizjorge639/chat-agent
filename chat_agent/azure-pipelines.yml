@@ -5,10 +5,9 @@
 # ══════════════════════════════════════════════════════════════
 
 trigger:
-  - none
-#   branches:
-#     include:
-#       - main
+  branches:
+    include:
+      - master
 
 pool:
   vmImage: 'ubuntu-latest'
