@@ -61,8 +61,6 @@ stages:
   jobs:
   - job: DeployToAppService
     displayName: 'Deploy to App Service'
-    # Retry once on transient 409 / SCM lock conflicts
-    retryCountOnTaskFailure: 1
     steps:
 
     - download: current
