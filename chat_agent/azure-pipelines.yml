@@ -14,8 +14,8 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  azureSubscription: '<SERVICE-CONNECTION-NAME>'
-  appServiceName: '<YOUR-APP-SERVICE-NAME>'
+  azureSubscription: 'azure-vs-enterprise'
+  appServiceName: 'extron-data-bot-app'
   pythonVersion: '3.11'
 
 stages:
@@ -81,4 +81,4 @@ stages:
         # Mounts the ZIP as read-only wwwroot instead of extracting.
         # Eliminates file-lock conflicts that cause 409 errors during ZIP Deploy.
         deploymentMethod: 'runFromPackage'
-        appSettings: '-GENERATED_DIR /tmp/generated'
+        appSettings: '-GENERATED_DIR /tmp/generated -SCM_DO_BUILD_DURING_DEPLOYMENT 0'
