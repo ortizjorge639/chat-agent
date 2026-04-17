@@ -38,11 +38,12 @@ stages:
         python -m pip install --upgrade pip
         pip install --find-links wheels -r requirements.txt
       displayName: 'Install Python dependencies'
+      workingDirectory: '$(Build.SourcesDirectory)/chat_agent'
 
     - task: ArchiveFiles@2
       displayName: 'Zip app into deployable package'
       inputs:
-        rootFolderOrFile: '$(Build.SourcesDirectory)'
+        rootFolderOrFile: '$(Build.SourcesDirectory)/chat_agent'
         includeRootFolder: false
         archiveType: 'zip'
         archiveFile: '$(Build.ArtifactStagingDirectory)/app.zip'
