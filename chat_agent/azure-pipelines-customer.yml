@@ -1,0 +1,83 @@
+# ══════════════════════════════════════════════════════════════
+# Azure DevOps CI/CD Pipeline  (Customer-Ready)
+# Builds the Python app and deploys to an existing App Service
+# Assumes app code (main_test.py, requirements.txt, etc.) is
+# at the ROOT of the repository — no subfolder prefix needed.
+# ══════════════════════════════════════════════════════════════
+
+trigger:
+  - none
+#   branches:
+#     include:
+#       - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  azureSubscription: '<SERVICE-CONNECTION-NAME>'   # Azure DevOps → Project Settings → Service connections
+  appServiceName: '<YOUR-APP-SERVICE-NAME>'        # Existing Linux App Service name
+  pythonVersion: '3.11'
+
+stages:
+# ══════════════════════════════════════════════════════════════
+# STAGE 1: BUILD — Install deps + package the app
+# ══════════════════════════════════════════════════════════════
+- stage: Build
+  displayName: 'Build & Package'
+  jobs:
+  - job: Package
+    displayName: 'Package Python App'
+    steps:
+
+    - task: UsePythonVersion@0
+      displayName: 'Use Python $(pythonVersion)'
+      inputs:
+        versionSpec: '$(pythonVersion)'
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install --find-links wheels -r requirements.txt
+      displayName: 'Install Python dependencies'
+
+    - task: ArchiveFiles@2
+      displayName: 'Zip app into deployable package'
+      inputs:
+        rootFolderOrFile: '$(Build.SourcesDirectory)'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/app.zip'
+        replaceExistingArchive: true
+
+    - publish: '$(Build.ArtifactStagingDirectory)/app.zip'
+      artifact: 'app-package'
+      displayName: 'Publish app package'
+
+# ══════════════════════════════════════════════════════════════
+# STAGE 2: DEPLOY — Push to existing App Service
+# ══════════════════════════════════════════════════════════════
+- stage: Deploy
+  displayName: 'Deploy Application'
+  dependsOn: Build
+  jobs:
+  - job: DeployToAppService
+    displayName: 'Deploy to App Service'
+    steps:
+
+    - download: current
+      artifact: 'app-package'
+      displayName: 'Download app package'
+
+    - task: AzureWebApp@1
+      displayName: 'Deploy to App Service (runFromPackage)'
+      inputs:
+        azureSubscription: $(azureSubscription)
+        appType: 'webAppLinux'
+        appName: $(appServiceName)
+        package: '$(Pipeline.Workspace)/app-package/app.zip'
+        runtimeStack: 'PYTHON|3.11'
+        startUpCommand: 'python main_test.py'
+        # Mounts the ZIP as read-only wwwroot instead of extracting.
+        # Eliminates file-lock conflicts that cause 409 errors during ZIP Deploy.
+        deploymentMethod: 'runFromPackage'
+        appSettings: '-GENERATED_DIR /tmp/generated -SCM_DO_BUILD_DURING_DEPLOYMENT 0'
