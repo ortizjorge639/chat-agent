@@ -38,9 +38,14 @@ stages:
     - script: |
         python -m pip install --upgrade pip
         python -m venv antenv
-        source antenv/bin/activate
-        pip install --find-links wheels -r requirements.txt
-      displayName: 'Install Python dependencies'
+        pip install \
+          --platform manylinux_2_28_x86_64 \
+          --python-version 3.11 \
+          --implementation cp \
+          --only-binary=:all: \
+          --target antenv/lib/python3.11/site-packages \
+          -r requirements.txt
+      displayName: 'Install Python dependencies (cross-platform for App Service)'
 
     - task: ArchiveFiles@2
       displayName: 'Zip app into deployable package'
