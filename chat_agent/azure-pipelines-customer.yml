@@ -38,14 +38,21 @@ stages:
     - script: |
         python -m pip install --upgrade pip
         python -m venv antenv
-        pip install \
+        . antenv/bin/activate
+        pip install --find-links wheels -r requirements.txt
+        # App Service (Debian Bullseye) has glibc 2.31.
+        # The build agent (Ubuntu 22.04+) has glibc 2.35, so pip downloads
+        # manylinux_2_34 cryptography wheels that crash on App Service.
+        # Fix: force-replace cryptography with the manylinux_2_28 wheel.
+        pip download cryptography \
           --platform manylinux_2_28_x86_64 \
           --python-version 3.11 \
           --implementation cp \
           --only-binary=:all: \
-          --target antenv/lib/python3.11/site-packages \
-          -r requirements.txt
-      displayName: 'Install Python dependencies (cross-platform for App Service)'
+          --no-deps \
+          -d /tmp/crypto_fix
+        pip install --force-reinstall --no-deps /tmp/crypto_fix/cryptography*.whl
+      displayName: 'Install Python dependencies'
 
     - task: ArchiveFiles@2
       displayName: 'Zip app into deployable package'
