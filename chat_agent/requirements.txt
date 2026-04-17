@@ -3,7 +3,7 @@
 --pre
 
 # Core — Microsoft Agent Framework (pinned to bundled wheels)
-agent-framework-core==1.0.0rc5
+agent-framework-core==1.0.0rc6
 agent-framework-azure-ai==1.0.0rc6
 botbuilder-core>=4.16.0
 aiohttp>=3.9.0
