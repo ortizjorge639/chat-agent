@@ -24,7 +24,10 @@ from agent.kernel import AgentKernel
 from data.loader import DataLoader
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-GENERATED_DIR = os.path.join(os.path.dirname(__file__), "generated")
+GENERATED_DIR = os.environ.get(
+    "GENERATED_DIR",
+    os.path.join(os.path.dirname(__file__), "generated"),
+)
 
 # ── Settings ────────────────────────────────────────────
 settings = Settings()

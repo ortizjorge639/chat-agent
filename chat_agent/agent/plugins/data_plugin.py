@@ -118,9 +118,7 @@ def create_data_tools(
             return (
                 f"Retrieved {result['total']} rows from table '{table_name}' "
                 f"(columns: {cols}). That's too many to display inline, so the "
-                f"data has been exported to a downloadable Excel file instead. "
-                f"The download link has been automatically sent to the user. "
-                f"Do NOT include any links, URLs, or file paths in your response."
+                f"data has been exported to a downloadable Excel file instead."
             )
 
         chunks = _rows_to_chunks(result["rows"], result["columns"])
@@ -164,9 +162,7 @@ def create_data_tools(
             return (
                 f"Retrieved {result['total']} rows from table '{table_name}' "
                 f"(columns: {cols}). That's too many to display inline, so the "
-                f"data has been exported to a downloadable Excel file instead. "
-                f"The download link has been automatically sent to the user. "
-                f"Do NOT include any links, URLs, or file paths in your response."
+                f"data has been exported to a downloadable Excel file instead."
             )
 
         chunks = _rows_to_chunks(result["rows"], result["columns"])
@@ -206,11 +202,7 @@ def create_data_tools(
             file_buffer.append(file_info)
             row_count = len(last_result['rows'])
             last_result.clear()
-            return (
-                f"Excel file generated: {file_info['name']} ({row_count} rows). "
-                f"The download link has been automatically sent to the user. "
-                f"Do NOT include any links, URLs, or file paths in your response."
-            )
+            return f"Excel file generated: {file_info['name']} ({row_count} rows)"
 
         if not table_name:
             return "No recent query results and no table specified. Provide a table_name."
@@ -220,11 +212,7 @@ def create_data_tools(
         result = loader.get_rows(table_name, fc, fv)
         file_info = _generate_excel(result["rows"], result["columns"], table_name)
         file_buffer.append(file_info)
-        return (
-            f"Excel file generated: {file_info['name']} ({result['total']} rows). "
-            f"The download link has been automatically sent to the user. "
-            f"Do NOT include any links, URLs, or file paths in your response."
-        )
+        return f"Excel file generated: {file_info['name']} ({result['total']} rows)"
 
     return [list_tables, get_schema, count_rows, get_rows,
             get_distinct_values, query_table, group_by, download_as_excel]

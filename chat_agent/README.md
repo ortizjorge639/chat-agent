@@ -283,6 +283,7 @@ Once created:
 | "Test in Web Chat" — no response, no errors | Messaging endpoint wrong or behind App Gateway | Verify URL ends with `/api/messages`; if behind a gateway, use the gateway URL — not the App Service URL |
 | `403 Forbidden` on App Service URL | App Service behind App Gateway / APIM | Use the gateway's public URL instead; direct access is blocked |
 | `Unauthorized` errors | App ID / password / tenant ID mismatch | Double-check all three values match between Entra, Bot Service, and App Service env vars |
+| "Test in Web Chat" — `HTTP status code Unauthorized` | Easy Auth blocking `/api/messages` | Add `/api/messages` to Easy Auth excluded paths — see [Checkpoint 4, Step 2, Part B, item 10](#step-2--enable-entra-id-authentication-easy-auth) |
 | `missing service principal` | App Registration has no service principal | Azure Portal → Entra ID → Enterprise applications → search your app. If missing, create one via `az ad sp create --id <APP_ID>` |
 | App Service returns 5xx | Startup command not set or dependencies missing | Check **Log stream**; verify startup command is `antenv/bin/python main.py` |
 | `ModuleNotFoundError` for local packages (e.g. `config`) | Windows backslash paths in zip **or** Oryx extraction path issue | Re-zip using the Python `zipfile` script (Step 5); ensure `sys.path.insert` is in `main.py` |
@@ -458,7 +459,25 @@ needed. Two parts: configure the app registration, then enable Easy Auth.
 ![App Service Authentication — configured](screenshots/easy-auth-complete.png)
 
 Once saved, the web UI (`/`) and `/api/chat` require a Microsoft login.
-`/api/messages` is unaffected — Bot Framework has its own auth.
+
+**10. Exclude `/api/messages` from Easy Auth**
+
+Easy Auth blocks **all** unauthenticated requests — including the
+server-to-server calls from Azure Bot Service to `/api/messages`.
+Without this exclusion, "Test in Web Chat" and Teams will return
+`HTTP status code Unauthorized`.
+
+The Azure Portal may not expose this setting. Run the included script:
+
+```powershell
+.\fix_easyauth_bot.ps1 `
+  -SubscriptionId "<subscription-id>" `
+  -ResourceGroup "<resource-group>" `
+  -AppServiceName "<app-service-name>"
+```
+
+The script checks current state, applies the exclusion, and verifies
+the result. It is safe to run multiple times (idempotent).
 
 Then set this environment variable on the App Service to enable
 defense-in-depth in the app code:
