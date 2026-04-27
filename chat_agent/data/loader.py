@@ -151,6 +151,10 @@ class DataLoader:
                 f"TrustServerCertificate=yes;"
             )
 
+        # Log sanitised connection string for diagnostics (masks password)
+        safe_conn = conn_str.replace(s.sql_password, "***") if s.sql_password else conn_str
+        logger.info("SQL connection string: %s", safe_conn)
+
         conn = pyodbc.connect(conn_str)
         table = s.sql_table
         df = pd.read_sql(f"SELECT * FROM {_bracket_table_name(table)}", conn)
