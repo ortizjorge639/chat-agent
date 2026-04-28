@@ -138,7 +138,6 @@ class DataLoader:
                 f"DRIVER={{{driver}}};"
                 f"SERVER={s.sql_server};"
                 f"DATABASE={s.sql_database};"
-                f"Trusted_Connection=yes;"
                 f"TrustServerCertificate=yes;"
                 f"Encrypt=yes;"
             )
