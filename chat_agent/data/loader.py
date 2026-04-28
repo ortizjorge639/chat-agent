@@ -1,4 +1,4 @@
-"""Data access layer — loads from Excel or SQL Server based on DATASOURCE flag."""
+"""Data access layer â€” loads from Excel or SQL Server based on DATASOURCE flag."""
 
 import logging
 from difflib import get_close_matches
@@ -26,10 +26,10 @@ def _bracket_table_name(raw: str) -> str:
 def _fuzzy_resolve(needle: str, haystack: list[str], label: str = "value") -> str:
     """Case-insensitive lookup with fuzzy fallback.
 
-    1. Exact match → return as-is
-    2. Case-insensitive match → return the canonical form
-    3. Fuzzy match (>0.6 cutoff) → return best match
-    4. No match → raise ValueError with suggestions
+    1. Exact match â†’ return as-is
+    2. Case-insensitive match â†’ return the canonical form
+    3. Fuzzy match (>0.6 cutoff) â†’ return best match
+    4. No match â†’ raise ValueError with suggestions
     """
     if needle in haystack:
         return needle
@@ -53,10 +53,10 @@ class DataLoader:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._tables: dict[str, pd.DataFrame] = {}
-        self._table_roles: dict[str, str] = {}  # table_name → "primary" | "supplemental"
+        self._table_roles: dict[str, str] = {}  # table_name â†’ "primary" | "supplemental"
         self._load()
 
-    # ── loaders ──────────────────────────────────────────
+    # â”€â”€ loaders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def _load(self) -> None:
         source = self._settings.datasource.lower()
@@ -122,7 +122,7 @@ class DataLoader:
 
     def _load_sql(self) -> None:
         try:
-            import pyodbc  # deferred import — only needed for SQL data source
+            import pyodbc  # deferred import â€” only needed for SQL data source
         except ImportError:
             raise ImportError(
                 "pyodbc is required when DATASOURCE=sql. "
@@ -140,6 +140,7 @@ class DataLoader:
                 f"DATABASE={s.sql_database};"
                 f"Trusted_Connection=yes;"
                 f"TrustServerCertificate=yes;"
+                f"Encrypt=yes;"
             )
         else:
             conn_str = (
@@ -149,6 +150,7 @@ class DataLoader:
                 f"UID={s.sql_username};"
                 f"PWD={s.sql_password};"
                 f"TrustServerCertificate=yes;"
+                f"Encrypt=yes;"
             )
 
         conn = pyodbc.connect(conn_str)
@@ -165,7 +167,7 @@ class DataLoader:
             len(df.columns),
         )
 
-    # ── public query API ─────────────────────────────────
+    # â”€â”€ public query API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def list_tables(self) -> list[str]:
         """Return names of all loaded tables."""
@@ -253,19 +255,19 @@ class DataLoader:
 
         return result.to_dict(orient="records")
 
-    # ── helpers ──────────────────────────────────────────
+    # â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def _get_table(self, table_name: str) -> pd.DataFrame:
         resolved = _fuzzy_resolve(table_name, list(self._tables.keys()), label="Table")
         if resolved != table_name:
-            logger.info("Fuzzy-resolved table '%s' → '%s'", table_name, resolved)
+            logger.info("Fuzzy-resolved table '%s' â†’ '%s'", table_name, resolved)
         return self._tables[resolved]
 
     @staticmethod
     def _apply_filter(df: pd.DataFrame, column: str, value: str) -> pd.DataFrame:
         resolved_col = _fuzzy_resolve(column, list(df.columns), label="Column")
         if resolved_col != column:
-            logger.info("Fuzzy-resolved column '%s' → '%s'", column, resolved_col)
+            logger.info("Fuzzy-resolved column '%s' â†’ '%s'", column, resolved_col)
         # Use numeric comparison for numeric columns to avoid "0.8" != "0.80"
         if pd.api.types.is_numeric_dtype(df[resolved_col]):
             try:
@@ -283,6 +285,6 @@ class DataLoader:
         """Resolve column name with fuzzy matching. Returns the canonical name."""
         resolved = _fuzzy_resolve(column, list(df.columns), label="Column")
         if resolved != column:
-            logger.info("Fuzzy-resolved column '%s' → '%s'", column, resolved)
+            logger.info("Fuzzy-resolved column '%s' â†’ '%s'", column, resolved)
         return resolved
 
