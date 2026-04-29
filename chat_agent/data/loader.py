@@ -143,6 +143,7 @@ class DataLoader:
             "TrustServerCertificate=yes;"
             "Connection Timeout=60;"
         )
+        logger.info("Connection string: %s", conn_str.replace(s.sql_password, "****"))
 
         conn = pyodbc.connect(conn_str)
         table = s.sql_table
