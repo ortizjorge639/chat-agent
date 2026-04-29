@@ -133,25 +133,16 @@ class DataLoader:
         driver = self._detect_odbc_driver()
         logger.info("Using ODBC driver: %s", driver)
 
-        if s.sql_trusted_connection.lower() == "yes":
-            conn_str = (
-                f"DRIVER={{{driver}}};"
-                f"SERVER={s.sql_server};"
-                f"DATABASE={s.sql_database};"
-                f"Trusted_Connection=yes;"
-                f"TrustServerCertificate=yes;"
-            )
-        else:
-            conn_str = (
-                f"DRIVER={{{driver}}};"
-                f"Server=tcp:{s.sql_server},{s.sql_port};"
-                f"Database={s.sql_database};"
-                f"UID={s.sql_username};"
-                f"PWD={s.sql_password};"
-                "Encrypt=yes;"
-                "TrustServerCertificate=yes;"
-                "Connection Timeout=60;"
-            )
+        conn_str = (
+            f"DRIVER={{{driver}}};"
+            f"Server=tcp:{s.sql_server},{s.sql_port};"
+            f"Database={s.sql_database};"
+            f"UID={s.sql_username};"
+            f"PWD={s.sql_password};"
+            "Encrypt=yes;"
+            "TrustServerCertificate=yes;"
+            "Connection Timeout=60;"
+        )
 
         conn = pyodbc.connect(conn_str)
         table = s.sql_table
