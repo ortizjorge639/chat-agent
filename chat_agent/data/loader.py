@@ -138,7 +138,8 @@ class DataLoader:
                 f"DRIVER={{{driver}}};"
                 f"SERVER={s.sql_server};"
                 f"DATABASE={s.sql_database};"
-                f"TrustServerCertificate=no;"
+                f"Trusted_Connection=yes;"
+                f"TrustServerCertificate=yes;"
             )
         else:
             conn_str = (
@@ -147,7 +148,7 @@ class DataLoader:
                 f"DATABASE={s.sql_database};"
                 f"UID={s.sql_username};"
                 f"PWD={s.sql_password};"
-                f"TrustServerCertificate=no;"
+                f"TrustServerCertificate=yes;"
             )
 
         conn = pyodbc.connect(conn_str)
