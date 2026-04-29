@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # SQL Server (production)
     sql_server: str = ""
+    sql_port: str = "1433"
     sql_database: str = ""
     sql_table: str = ""
     sql_trusted_connection: str = "yes"

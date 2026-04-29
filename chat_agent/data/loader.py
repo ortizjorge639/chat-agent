@@ -144,11 +144,13 @@ class DataLoader:
         else:
             conn_str = (
                 f"DRIVER={{{driver}}};"
-                f"SERVER={s.sql_server};"
-                f"DATABASE={s.sql_database};"
+                f"Server=tcp:{s.sql_server},{s.sql_port};"
+                f"Database={s.sql_database};"
                 f"UID={s.sql_username};"
                 f"PWD={s.sql_password};"
-                f"TrustServerCertificate=yes;"
+                "Encrypt=yes;"
+                "TrustServerCertificate=yes;"
+                "Connection Timeout=60;"
             )
 
         conn = pyodbc.connect(conn_str)
